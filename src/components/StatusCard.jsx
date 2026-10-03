@@ -12,13 +12,13 @@ export default function StatusCard({ snap }) {
   const lvl = LEVELS[snap.overall]
   const critical = snap.overall === 3
   const bg = critical ? lvl.color : snap.overall ? `${lvl.color}2b` : 'var(--color-panel)'
-  const ink = critical ? '#f4f1ee' : undefined
-  const sub = critical ? '#f4f1eecc' : undefined
+  const ink = critical ? '#fbfaf7' : undefined
+  const sub = critical ? '#fbfaf7cc' : undefined
 
   return (
     <section
       className="flex flex-wrap items-stretch border transition-colors duration-1000"
-      style={{ background: bg, borderColor: snap.overall ? lvl.color : 'var(--color-line)', borderRadius: 3 }}
+      style={{ background: bg, borderColor: snap.overall ? lvl.color : 'var(--color-line-strong)', borderWidth: 1.5, borderRadius: 3 }}
       aria-live="polite"
     >
       <div className="flex min-w-0 flex-1 items-center gap-4 px-4 py-2">
@@ -27,7 +27,7 @@ export default function StatusCard({ snap }) {
             Overall risk
           </div>
           <div
-            className="num text-[26px] font-semibold leading-8 tracking-wide transition-colors duration-1000"
+            className="num text-[26px] font-bold leading-8 tracking-wide transition-colors duration-1000"
             style={{ color: critical ? ink : lvl.color }}
           >
             {lvl.label}
@@ -55,11 +55,11 @@ export default function StatusCard({ snap }) {
 
 function Stat({ label, value, unit, ink, sub, small }) {
   return (
-    <div className="flex min-w-[96px] flex-col justify-center px-4 py-2" style={{ borderColor: ink ? '#f4f1ee40' : 'var(--color-line)' }}>
+    <div className="flex min-w-[96px] flex-col justify-center px-4 py-2" style={{ borderColor: ink ? '#fbfaf740' : 'var(--color-line)' }}>
       <dt className="label" style={{ color: sub }}>
         {label}
       </dt>
-      <dd className={`num font-semibold leading-7 ${small ? 'text-[15px]' : 'text-[22px]'}`} style={{ color: ink }}>
+      <dd className={`num font-bold leading-7 ${small ? 'text-[15px]' : 'text-[22px]'}`} style={{ color: ink }}>
         {value}
         {unit && (
           <span className="ml-0.5 text-[12px] font-normal text-muted" style={{ color: sub }}>

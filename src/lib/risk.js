@@ -7,12 +7,12 @@ export const COLS = 4
 export const ZONE_COUNT = ROWS.length * COLS
 
 export const LEVELS = [
-  { key: 'SAFE', label: 'SAFE', color: '#5a9468' },
-  { key: 'WATCH', label: 'WATCH', color: '#bf9b3c' },
-  { key: 'WARNING', label: 'WARNING', color: '#c06f38' },
-  { key: 'CRITICAL', label: 'CRITICAL', color: '#b4463e' },
+  { key: 'SAFE', label: 'SAFE', color: '#2f7a45' },
+  { key: 'WATCH', label: 'WATCH', color: '#9a7410' },
+  { key: 'WARNING', label: 'WARNING', color: '#b4561a' },
+  { key: 'CRITICAL', label: 'CRITICAL', color: '#b02a22' },
 ]
-export const INFO_COLOR = '#4a7fab'
+export const INFO_COLOR = '#111111'
 
 export const DEFAULT_SETTINGS = {
   // Simulation numbers are people per zone on a station platform.

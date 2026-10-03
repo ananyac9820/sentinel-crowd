@@ -1,7 +1,7 @@
 import { ResponsiveContainer, ComposedChart, Area, Line, XAxis, YAxis, ReferenceLine, Tooltip, CartesianGrid } from 'recharts'
 
 const WINDOW = 120
-const AXIS = { fill: '#8a929b', fontSize: 11, fontFamily: 'IBM Plex Mono' }
+const AXIS = { fill: '#3d3c38', fontSize: 11, fontWeight: 600, fontFamily: 'IBM Plex Mono' }
 
 export default function DensityChart({ timeline, now, className = '' }) {
   const end = Math.max(now, WINDOW)
@@ -13,7 +13,7 @@ export default function DensityChart({ timeline, now, className = '' }) {
       <div className="panel-head">
         <span className="label">Density, last 2 minutes</span>
         <div className="ml-auto flex items-center gap-4 text-[11px] text-muted">
-          <Key swatch={<span className="h-2.5 w-2.5" style={{ background: '#4a7fab80' }} />} text="People (left axis)" />
+          <Key swatch={<span className="h-2.5 w-2.5" style={{ background: '#11111140' }} />} text="People (left axis)" />
           <Key swatch={<span className="h-0.5 w-4 bg-fg" />} text="Risk score (right)" />
           <Key swatch={<span className="w-4 border-t border-dashed border-crit" />} text="Danger, 75" />
         </div>
@@ -24,7 +24,7 @@ export default function DensityChart({ timeline, now, className = '' }) {
         ) : (
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={timeline} margin={{ top: 4, right: 4, bottom: 0, left: -18 }}>
-              <CartesianGrid stroke="#30353c" vertical={false} />
+              <CartesianGrid stroke="#d6d4cd" vertical={false} />
               <XAxis
                 dataKey="t"
                 type="number"
@@ -32,20 +32,20 @@ export default function DensityChart({ timeline, now, className = '' }) {
                 ticks={[0, 30, 60, 90, 120].map((s) => end - WINDOW + s)}
                 tickFormatter={(v) => (Math.round(v - end) === 0 ? 'now' : `${Math.round(v - end)}s`)}
                 tick={AXIS}
-                axisLine={{ stroke: '#363c44' }}
+                axisLine={{ stroke: '#111111' }}
                 tickLine={false}
               />
               <YAxis yAxisId="p" domain={[0, Math.ceil(maxPeople / 20) * 20]} tick={AXIS} axisLine={false} tickLine={false} />
               <YAxis yAxisId="r" orientation="right" domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} tick={AXIS} axisLine={false} tickLine={false} width={30} />
-              <ReferenceLine yAxisId="r" y={75} stroke="#b4463e" strokeDasharray="5 4" />
+              <ReferenceLine yAxisId="r" y={75} stroke="#b02a22" strokeWidth={1.5} strokeDasharray="5 4" />
               <Tooltip
-                contentStyle={{ background: '#22262b', border: '1px solid #4a525c', borderRadius: 2, fontSize: 12, fontFamily: 'IBM Plex Mono' }}
-                labelStyle={{ color: '#9aa2ab' }}
+                contentStyle={{ background: '#fbfaf7', border: '1.5px solid #111111', borderRadius: 2, fontSize: 12, fontFamily: 'IBM Plex Mono' }}
+                labelStyle={{ color: '#55534d' }}
                 labelFormatter={(v) => `${Math.round(v - end)}s`}
                 formatter={(val, name) => [val, name === 'people' ? 'People' : 'Risk score']}
               />
-              <Area yAxisId="p" dataKey="people" type="monotone" stroke="#4a7fab" strokeWidth={1.5} fill="#4a7fab" fillOpacity={0.28} isAnimationActive={false} />
-              <Line yAxisId="r" dataKey="risk" type="monotone" stroke="#d9dde1" strokeWidth={1.75} dot={false} isAnimationActive={false} />
+              <Area yAxisId="p" dataKey="people" type="monotone" stroke="#6b6963" strokeWidth={1.5} fill="#111111" fillOpacity={0.12} isAnimationActive={false} />
+              <Line yAxisId="r" dataKey="risk" type="monotone" stroke="#111111" strokeWidth={2.25} dot={false} isAnimationActive={false} />
             </ComposedChart>
           </ResponsiveContainer>
         )}

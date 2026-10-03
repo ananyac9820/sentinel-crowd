@@ -18,7 +18,7 @@ export default class ErrorBoundary extends Component {
       <div className="flex h-full items-center justify-center p-6">
         <div className="panel max-w-md p-6">
           <p className="label text-warn">Error</p>
-          <p className="mt-2 font-semibold">Something went wrong on this screen.</p>
+          <p className="mt-2 font-bold">Something went wrong on this screen.</p>
           <p className="mt-1 text-sm text-muted">Reloading restarts the dashboard in Simulation mode.</p>
           <button
             onClick={() => {

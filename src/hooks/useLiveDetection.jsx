@@ -30,7 +30,7 @@ function Notice({ tone = 'neutral', title, children, actions }) {
             <AlertIcon size={12} /> Problem
           </p>
         )}
-        <p className="text-[15px] font-semibold text-fg">{title}</p>
+        <p className="text-[15px] font-bold text-fg">{title}</p>
         <div className="mt-1 text-[13px] leading-relaxed text-muted">{children}</div>
         <div className="mt-4 flex flex-wrap gap-2">{actions}</div>
       </div>
@@ -293,7 +293,7 @@ export default function useLiveDetection({ active, onCounts, onSwitchToSim }) {
         boxes.map((b, i) => (
           <div
             key={i}
-            className="pointer-events-none absolute border border-[#d9dde199]"
+            className="pointer-events-none absolute border border-[#ffffffcc] outline outline-1 outline-[#00000066]"
             style={{ left: `${b.x * 100}%`, top: `${b.y * 100}%`, width: `${b.w * 100}%`, height: `${b.h * 100}%` }}
           />
         ))}

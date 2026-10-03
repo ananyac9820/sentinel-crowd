@@ -28,10 +28,10 @@ export default function ZoneTable({ snap }) {
             >
               <div className="num flex items-center justify-between text-[11px] text-muted">
                 {zoneName(i)}
-                {snap.surges[i] && <span className="text-[9px] font-semibold tracking-wider text-warn">SURGE</span>}
+                {snap.surges[i] && <span className="text-[9px] font-bold tracking-wider text-warn">SURGE</span>}
               </div>
               <div className="flex items-baseline justify-between">
-                <span className="num text-[20px] font-semibold leading-6" style={{ color: l ? lvl.color : undefined }}>
+                <span className="num text-[20px] font-bold leading-6" style={{ color: l ? lvl.color : undefined }}>
                   {c}
                 </span>
                 <span className={`num text-[13px] ${tr.cls}`} aria-label={tr.label}>

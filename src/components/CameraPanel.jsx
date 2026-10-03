@@ -25,7 +25,7 @@ export default function CameraPanel({ mode, snap, countsRef, sim, live, classNam
 
       <div className="relative flex flex-1 items-center justify-center p-2 [container-type:size] max-lg:aspect-video lg:min-h-[220px]">
         <div
-          className="relative overflow-hidden bg-[#17191c]"
+          className="relative overflow-hidden bg-[#f6f5f1]"
           style={{ aspectRatio: aspect, width: `min(100cqw, calc(100cqh * ${aspect}))`, borderRadius: 2 }}
         >
           {mode === 'sim' ? <SimulatedFeed countsRef={countsRef} running={sim.playing} /> : live?.feed}
@@ -49,7 +49,7 @@ function CctvOverlay({ label }) {
   return (
     <div
       className="num pointer-events-none absolute right-1 top-1 flex items-center gap-2 px-1.5 py-px text-[11px] text-fg"
-      style={{ background: '#1b1e22e6', borderRadius: 2 }}
+      style={{ background: '#f6f5f1ee', borderRadius: 2 }}
     >
       <span className="flex items-center gap-1 text-muted">
         <span className="inline-block h-1.5 w-1.5 bg-crit" /> REC

@@ -15,7 +15,7 @@ export default function SettingsPanel({ mode, value, onChange, onClose }) {
   const invalid = !(value.watch < value.warning && value.warning < value.critical)
 
   return (
-    <div className="fixed inset-0 z-40 flex justify-end bg-[#0f1113b3]" onClick={onClose}>
+    <div className="fixed inset-0 z-40 flex justify-end bg-[#11111166]" onClick={onClose}>
       <aside
         className="h-full w-full max-w-sm overflow-y-auto border-l border-line-strong bg-panel"
         onClick={(e) => e.stopPropagation()}
@@ -62,7 +62,7 @@ export default function SettingsPanel({ mode, value, onChange, onClose }) {
           {invalid && <p className="mt-3 text-[12px] text-warn">Thresholds should increase: WATCH, then WARNING, then CRITICAL.</p>}
 
           <div className="mt-5 border-t border-line pt-4 text-[12px] leading-relaxed text-muted">
-            <p className="mb-1 font-semibold text-fg">How risk is computed</p>
+            <p className="mb-1 font-bold text-fg">How risk is computed</p>
             <p>Each zone gets a level from its people count.</p>
             <p>A surge fires when a zone's count rises by the percentage and minimum number of people above, within the time window.</p>
             <p>Overall risk is the worst zone's level, raised by one level while any zone is surging.</p>

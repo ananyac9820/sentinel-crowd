@@ -42,7 +42,7 @@ function AlertItem({ a }) {
       >
         <div className="num flex items-center gap-2.5 text-[11px] leading-4">
           <span className="text-dim">{fmt(a.time)}</span>
-          <span className="w-[62px] font-semibold" style={{ color }}>
+          <span className="w-[62px] font-bold" style={{ color }}>
             {sevLabel}
           </span>
           <span className="w-9 text-fg">{a.zone}</span>
@@ -52,7 +52,7 @@ function AlertItem({ a }) {
         <p className={`mt-0.5 text-[13px] leading-[18px] text-fg ${open ? '' : 'truncate'}`}>{a.message}</p>
         {open && (
           <p className="mt-1.5 border-t border-line pt-1.5 text-[12px] leading-snug text-muted">
-            <span className="font-semibold text-fg">Why this alert: </span>
+            <span className="font-bold text-fg">Why this alert: </span>
             {a.why}
           </p>
         )}
