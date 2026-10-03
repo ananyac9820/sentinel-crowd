@@ -1,0 +1,96 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --color-ink-950: #07090e;
+  --color-ink-900: #0c1018;
+  --color-ink-850: #111722;
+  --color-ink-800: #161d2a;
+  --color-ink-700: #222b3b;
+  --color-accent: #6366f1;
+  --color-accent-soft: #818cf8;
+  --color-safe: #22c55e;
+  --color-watch: #eab308;
+  --color-warn: #f97316;
+  --color-crit: #ef4444;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-ink-950);
+  color: #e2e8f0;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.card {
+  background: var(--color-ink-900);
+  border: 1px solid rgb(148 163 184 / 0.1);
+  border-radius: 0.875rem;
+  box-shadow: 0 10px 30px -12px rgb(0 0 0 / 0.6);
+}
+
+.label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgb(148 163 184);
+}
+
+/* Pulsing red frame around the whole dashboard at CRITICAL */
+@keyframes crit-pulse {
+  0%,
+  100% {
+    box-shadow: inset 0 0 0 3px rgb(239 68 68 / 0.95), inset 0 0 60px rgb(239 68 68 / 0.25);
+  }
+  50% {
+    box-shadow: inset 0 0 0 3px rgb(239 68 68 / 0.25), inset 0 0 20px rgb(239 68 68 / 0.05);
+  }
+}
+.crit-frame {
+  animation: crit-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.slide-in {
+  animation: slide-in 0.35s ease-out;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0.2;
+  }
+}
+.blink {
+  animation: blink 1.4s steps(2, start) infinite;
+}
+
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: #2a3446 transparent;
+}
+
+input[type='number']::-webkit-inner-spin-button {
+  opacity: 0.4;
+}
