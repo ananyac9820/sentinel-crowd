@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Upload, Webcam, FlaskConical, RefreshCw, AlertTriangle, Loader2, Cpu, Pause, Play } from 'lucide-react'
+import { UploadIcon, PlayIcon, PauseIcon, AlertIcon } from '../components/Icons.jsx'
 import { getDetector } from '../lib/detector.js'
 import { ROWS, COLS, ZONE_COUNT } from '../lib/risk.js'
 
@@ -11,29 +11,52 @@ function friendlyModelError(err) {
   const msg = String(err?.message || err)
   if (!navigator.onLine || /fetch|network|Failed to load|404/i.test(msg))
     return {
-      title: 'Couldn’t download the AI model',
-      detail: 'This laptop looks offline or the network is blocking Google’s model server. Connect to the internet once — after that the model is cached on this laptop.',
+      title: 'Could not download the AI model',
+      detail:
+        'This laptop looks offline, or the network is blocking the model server. Connect to the internet once. After that the model is cached on this laptop.',
     }
   if (/webgl|backend/i.test(msg))
-    return { title: 'The AI engine couldn’t start', detail: 'This browser couldn’t start WebGL. Try Chrome or Edge with hardware acceleration enabled.' }
+    return { title: 'The AI engine could not start', detail: 'This browser could not start WebGL. Try Chrome or Edge with hardware acceleration turned on.' }
   return { title: 'The AI model failed to load', detail: msg.slice(0, 160) }
 }
 
-function Panel({ icon, title, children, actions }) {
+// Full-feed message used for errors and empty states.
+function Notice({ tone = 'neutral', title, children, actions }) {
   return (
-    <div className="absolute inset-0 z-10 flex items-center justify-center bg-ink-950/90 p-6 text-center">
-      <div className="max-w-md">
-        <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-ink-800">{icon}</div>
-        <p className="font-semibold text-slate-100">{title}</p>
-        <div className="mt-1.5 text-sm leading-relaxed text-slate-400">{children}</div>
-        <div className="mt-5 flex flex-wrap justify-center gap-2">{actions}</div>
+    <div className="absolute inset-0 z-10 flex items-center justify-center bg-panel p-6">
+      <div className="w-full max-w-md">
+        {tone === 'error' && (
+          <p className="label mb-1 flex items-center gap-1.5 text-warn">
+            <AlertIcon size={12} /> Problem
+          </p>
+        )}
+        <p className="text-[15px] font-semibold text-fg">{title}</p>
+        <div className="mt-1 text-[13px] leading-relaxed text-muted">{children}</div>
+        <div className="mt-4 flex flex-wrap gap-2">{actions}</div>
+      </div>
+    </div>
+  )
+}
+
+// Skeleton of the camera view: 4x3 grid of placeholder blocks with a status line.
+function FeedSkeleton({ message, action }) {
+  return (
+    <div className="absolute inset-0 z-10 flex flex-col bg-panel p-2" aria-busy="true">
+      <div className="grid flex-1 grid-cols-4 grid-rows-3 gap-1.5">
+        {Array.from({ length: 12 }, (_, i) => (
+          <div key={i} className="skel" style={{ animationDelay: `${(i % 4) * 0.12}s` }} />
+        ))}
+      </div>
+      <div className="flex items-center gap-3 pt-2">
+        <span className="text-[13px] text-fg">{message}</span>
+        <span className="ml-auto">{action}</span>
       </div>
     </div>
   )
 }
 
 // Live Detection: COCO-SSD person detection on an uploaded video or webcam,
-// sampled every 500ms, people counted into the 4×3 zone grid.
+// sampled every 500 ms, people counted into the 4x3 zone grid.
 export default function useLiveDetection({ active, onCounts, onSwitchToSim }) {
   const videoRef = useRef(null)
   const fileRef = useRef(null)
@@ -51,6 +74,7 @@ export default function useLiveDetection({ active, onCounts, onSwitchToSim }) {
   const [sources, setSources] = useState([WEBCAM])
   const [sourceId, setSourceId] = useState(null)
   const [feedError, setFeedError] = useState(null)
+  const [videoLoading, setVideoLoading] = useState(false)
   const [aspect, setAspect] = useState(16 / 9)
   const [boxes, setBoxes] = useState([])
   const [paused, setPaused] = useState(false)
@@ -69,7 +93,7 @@ export default function useLiveDetection({ active, onCounts, onSwitchToSim }) {
       setStatus('error')
       setError({
         title: 'The AI model is taking too long',
-        detail: 'The network or this laptop seems slow. It will keep loading in the background — or switch to Simulation now.',
+        detail: 'The network or this laptop seems slow. It will keep loading in the background, or you can switch to Simulation now.',
       })
     }, SLOW_LOAD_MS)
     getDetector((m) => !cancelled && setStatusMsg(m))
@@ -105,15 +129,17 @@ export default function useLiveDetection({ active, onCounts, onSwitchToSim }) {
     setFeedError(null)
     setPaused(false)
     const src = sourcesRef.current.find((s) => s.id === sourceId)
-    if (!v || !active || !src) return
+    if (!v || !active || !src) return setVideoLoading(false)
     let stale = false
+    setVideoLoading(true)
 
     if (src.kind === 'file') {
       v.srcObject = null
       v.src = src.url
       v.play().catch(() => {})
     } else if (!navigator.mediaDevices?.getUserMedia) {
-      setFeedError('This browser doesn’t allow camera access here. Upload an MP4 instead.')
+      setVideoLoading(false)
+      setFeedError('This browser does not allow camera access on this page. Webcams need HTTPS or localhost. Upload an MP4 instead.')
     } else {
       navigator.mediaDevices
         .getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false })
@@ -124,13 +150,14 @@ export default function useLiveDetection({ active, onCounts, onSwitchToSim }) {
           v.srcObject = stream
           v.play().catch(() => {})
         })
-        .catch((e) =>
+        .catch((e) => {
+          setVideoLoading(false)
           setFeedError(
             e?.name === 'NotAllowedError'
               ? 'Camera permission was blocked. Allow camera access in the address bar, or upload an MP4.'
-              : 'No webcam found. Upload an MP4 instead.',
-          ),
-        )
+              : 'No webcam was found. Upload an MP4 instead.',
+          )
+        })
     }
     return () => {
       stale = true
@@ -139,7 +166,7 @@ export default function useLiveDetection({ active, onCounts, onSwitchToSim }) {
     }
   }, [sourceId, active])
 
-  // ---- Detection loop: every 500ms, not every frame ----
+  // ---- Detection loop: every 500 ms, not every frame ----
   useEffect(() => {
     if (!active || !model || !sourceId) return
     let busy = false
@@ -177,16 +204,16 @@ export default function useLiveDetection({ active, onCounts, onSwitchToSim }) {
     }
   }, [active, model, sourceId])
 
-  // Release the webcam when leaving Live mode.
+  // Release the webcam when leaving the dashboard.
   useEffect(() => () => stopStream(), [])
 
   const onFile = (e) => {
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file) return
-    if (!file.type.startsWith('video/')) return setFeedError('That file isn’t a video. Please choose an MP4.')
+    if (!file.type.startsWith('video/')) return setFeedError('That file is not a video. Please choose an MP4.')
     const n = sources.filter((s) => s.kind === 'file').length + 1
-    const s = { id: `file-${Date.now()}`, label: `CAM-0${n} · ${file.name}`, kind: 'file', url: URL.createObjectURL(file) }
+    const s = { id: `file-${Date.now()}`, label: `CAM-0${n} ${file.name}`, kind: 'file', url: URL.createObjectURL(file) }
     setSources((list) => [...list, s])
     setSourceId(s.id)
   }
@@ -200,34 +227,34 @@ export default function useLiveDetection({ active, onCounts, onSwitchToSim }) {
 
   const current = sources.find((s) => s.id === sourceId)
   const ready = status === 'ready'
-  const showGrid = ready && !!current && !feedError
-
-  const btn =
-    'inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-ink-850 px-2.5 py-1 text-xs font-medium text-slate-300 hover:bg-ink-800 hover:text-white'
-  const primary =
-    'inline-flex items-center gap-1.5 rounded-lg bg-accent px-3.5 py-2 text-sm font-semibold text-white hover:bg-indigo-500'
-  const secondary =
-    'inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-ink-800 px-3.5 py-2 text-sm text-slate-200 hover:bg-ink-700'
+  const showGrid = ready && !!current && !feedError && !videoLoading
 
   const fileInput = <input ref={fileRef} type="file" accept="video/*" className="hidden" onChange={onFile} />
+  const upload = (primary) => (
+    <button className={`btn ${primary ? 'btn-primary' : ''}`} onClick={() => fileRef.current?.click()}>
+      <UploadIcon size={12} /> Upload MP4
+    </button>
+  )
+  const toSim = (primary) => (
+    <button className={`btn ${primary ? 'btn-primary' : ''}`} onClick={onSwitchToSim}>
+      Switch to Simulation
+    </button>
+  )
 
   const controls = (
     <>
       {fileInput}
-      <span
-        className="hidden xl:inline-flex items-center gap-1 text-[11px] text-slate-500"
-        title={modelInfo ? `Backend: ${modelInfo.backend}` : undefined}
-      >
-        <Cpu size={12} />
-        {ready ? (modelInfo?.cached ? 'Model ready · cached' : 'Model ready') : status === 'loading' ? 'Loading model…' : 'Model not loaded'}
+      <span className="num hidden text-[11px] text-dim xl:inline" title={modelInfo ? `Backend: ${modelInfo.backend}` : undefined}>
+        {ready ? (modelInfo?.cached ? 'Model ready, cached' : 'Model ready') : status === 'loading' ? 'Loading model' : 'Model not loaded'}
       </span>
       <select
         value={sourceId ?? ''}
         onChange={(e) => setSourceId(e.target.value || null)}
-        className="max-w-[220px] rounded-lg border border-white/10 bg-ink-850 px-2 py-1 text-xs text-slate-200 focus:border-accent focus:outline-none"
+        className="h-7 max-w-[200px] border border-line-strong bg-raised px-1.5 text-[12px] text-fg"
+        style={{ borderRadius: 2 }}
         aria-label="Camera source"
       >
-        <option value="">Select camera…</option>
+        <option value="">Select camera</option>
         {sources.map((s) => (
           <option key={s.id} value={s.id}>
             {s.label}
@@ -235,13 +262,11 @@ export default function useLiveDetection({ active, onCounts, onSwitchToSim }) {
         ))}
       </select>
       {current?.kind === 'file' && (
-        <button className={btn} onClick={togglePlay} aria-label={paused ? 'Play' : 'Pause'}>
-          {paused ? <Play size={13} /> : <Pause size={13} />}
+        <button className="btn w-7 justify-center px-0" onClick={togglePlay} aria-label={paused ? 'Play' : 'Pause'}>
+          {paused ? <PlayIcon size={12} /> : <PauseIcon size={12} />}
         </button>
       )}
-      <button className={btn} onClick={() => fileRef.current?.click()}>
-        <Upload size={13} /> Upload MP4
-      </button>
+      {upload(false)}
     </>
   )
 
@@ -254,91 +279,84 @@ export default function useLiveDetection({ active, onCounts, onSwitchToSim }) {
         loop
         className="absolute inset-0 h-full w-full object-fill"
         onLoadedMetadata={(e) => e.target.videoWidth && setAspect(e.target.videoWidth / e.target.videoHeight)}
+        onLoadedData={() => setVideoLoading(false)}
+        onPlaying={() => setVideoLoading(false)}
         onPlay={() => setPaused(false)}
         onPause={() => setPaused(true)}
-        onError={() => current?.kind === 'file' && setFeedError('This video can’t be played in the browser. Try an H.264 MP4.')}
+        onError={() => {
+          if (current?.kind !== 'file') return
+          setVideoLoading(false)
+          setFeedError('This video cannot be played in the browser. Try an H.264 MP4.')
+        }}
       />
       {showGrid &&
         boxes.map((b, i) => (
           <div
             key={i}
-            className="pointer-events-none absolute rounded-[3px] border border-slate-100/60 bg-slate-100/5"
+            className="pointer-events-none absolute border border-[#d9dde199]"
             style={{ left: `${b.x * 100}%`, top: `${b.y * 100}%`, width: `${b.w * 100}%`, height: `${b.h * 100}%` }}
           />
         ))}
     </>
   )
 
-  const toSim = (
-    <button className={status === 'error' ? primary : secondary} onClick={onSwitchToSim}>
-      <FlaskConical size={15} /> Switch to Simulation
-    </button>
-  )
-
   let overlay = null
   if (status === 'loading' || status === 'idle') {
-    overlay = (
-      <Panel icon={<Loader2 size={20} className="animate-spin text-accent-soft" />} title={statusMsg || 'Loading AI model…'} actions={toSim}>
-        Person detection runs entirely in this browser. First load downloads the model; after that it’s cached on this laptop.
-      </Panel>
-    )
+    overlay = <FeedSkeleton message={statusMsg || 'Loading AI model…'} action={toSim(false)} />
   } else if (status === 'error') {
     overlay = (
-      <Panel
-        icon={<AlertTriangle size={20} className="text-warn" />}
+      <Notice
+        tone="error"
         title={error?.title}
         actions={
           <>
-            {toSim}
-            <button className={secondary} onClick={() => setRetry((r) => r + 1)}>
-              <RefreshCw size={15} /> Try again
+            {toSim(true)}
+            <button className="btn" onClick={() => setRetry((r) => r + 1)}>
+              Try again
             </button>
           </>
         }
       >
         {error?.detail}
-      </Panel>
+      </Notice>
     )
   } else if (feedError) {
     overlay = (
-      <Panel
-        icon={<AlertTriangle size={20} className="text-warn" />}
-        title="Can’t show this camera"
+      <Notice
+        tone="error"
+        title="This camera cannot be shown"
         actions={
           <>
-            <button className={primary} onClick={() => fileRef.current?.click()}>
-              <Upload size={15} /> Upload MP4
-            </button>
-            {toSim}
+            {upload(true)}
+            {toSim(false)}
           </>
         }
       >
         {feedError}
-      </Panel>
+      </Notice>
     )
   } else if (!current) {
     overlay = (
-      <Panel
-        icon={<Cpu size={20} className="text-accent-soft" />}
-        title="AI model ready — choose a camera"
+      <Notice
+        title="AI model ready. Choose a camera."
         actions={
           <>
-            <button className={primary} onClick={() => fileRef.current?.click()}>
-              <Upload size={15} /> Upload CCTV clip (MP4)
-            </button>
-            <button className={secondary} onClick={() => setSourceId(WEBCAM.id)}>
-              <Webcam size={15} /> Use webcam
+            {upload(true)}
+            <button className="btn" onClick={() => setSourceId(WEBCAM.id)}>
+              Use webcam
             </button>
           </>
         }
       >
-        Tip: an overhead or high-angle crowd clip works best. People are counted into the 4×3 zone grid twice a second.
-      </Panel>
+        A high-angle or overhead crowd clip works best. People are counted into the 4x3 zone grid twice a second. The video stays on this device.
+      </Notice>
     )
+  } else if (videoLoading) {
+    overlay = <FeedSkeleton message={current.kind === 'webcam' ? 'Starting webcam…' : 'Loading video…'} />
   }
 
   return {
-    title: current ? current.label : 'Live camera',
+    title: current ? current.label : null,
     aspect: current ? aspect : 16 / 9,
     showGrid,
     feed,

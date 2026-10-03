@@ -32,6 +32,18 @@ Keyboard shortcuts: Space pauses or plays, R restarts the scenario, F toggles fu
 
 Everything runs in the browser. There is no backend, no API key, and video never leaves the device.
 
+## Deploy
+
+The app builds to a static site in `dist/` with relative paths and hash-based routes, so it works on any static host without rewrite rules.
+
+```bash
+npm run build
+```
+
+On Vercel, import the GitHub repository and keep the detected Vite settings (build command `npm run build`, output directory `dist`). On Netlify, the included `netlify.toml` sets the same values.
+
+The AI model is loaded from Google's CDN at runtime. Webcam access only works on HTTPS or localhost, which Vercel and Netlify provide by default.
+
 ## Limitations
 
 This is a prototype. Person detection uses a general model and may undercount in very dense crowds. A production version would use a crowd density model.

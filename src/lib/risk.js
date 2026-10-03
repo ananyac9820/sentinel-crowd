@@ -7,12 +7,12 @@ export const COLS = 4
 export const ZONE_COUNT = ROWS.length * COLS
 
 export const LEVELS = [
-  { key: 'SAFE', label: 'SAFE', color: '#22c55e' },
-  { key: 'WATCH', label: 'WATCH', color: '#eab308' },
-  { key: 'WARNING', label: 'WARNING', color: '#f97316' },
-  { key: 'CRITICAL', label: 'CRITICAL', color: '#ef4444' },
+  { key: 'SAFE', label: 'SAFE', color: '#5a9468' },
+  { key: 'WATCH', label: 'WATCH', color: '#bf9b3c' },
+  { key: 'WARNING', label: 'WARNING', color: '#c06f38' },
+  { key: 'CRITICAL', label: 'CRITICAL', color: '#b4463e' },
 ]
-export const INFO_COLOR = '#818cf8'
+export const INFO_COLOR = '#4a7fab'
 
 export const DEFAULT_SETTINGS = {
   // Simulation numbers are people per zone on a station platform.
@@ -50,7 +50,7 @@ function neighbours(i) {
   return out
 }
 
-const SMOOTH_WINDOW = 1.5 // seconds — averages out detector flicker
+const SMOOTH_WINDOW = 1.5 // seconds, averages out detector flicker
 const HISTORY = 130 // seconds of history kept
 const TIMELINE = 120 // seconds shown on the chart
 const SURGE_COOLDOWN = 30
@@ -146,10 +146,10 @@ export class CrowdEngine {
         const th = thresholdFor(lvl, s)
         const msg =
           lvl === 1
-            ? `Zone ${z} getting busy — ${c} people. Keep a steward watching this area.`
+            ? `Zone ${z} getting busy: ${c} people. Keep a steward watching this area.`
             : lvl === 2
-              ? `Zone ${z} congested — ${c} people. Pause entry and divert flow towards ${zoneName(calmestNeighbour(i))}.`
-              : `Zone ${z} at crush-risk density — ${c} people. Open exit gate ${gateFor(i)} and halt platform entry now.`
+              ? `Zone ${z} congested: ${c} people. Pause entry and divert flow towards ${zoneName(calmestNeighbour(i))}.`
+              : `Zone ${z} at crush-risk density: ${c} people. Open exit gate ${gateFor(i)} and halt platform entry now.`
         this.pushAlert({
           time: wall,
           zone: z,
@@ -175,8 +175,8 @@ export class CrowdEngine {
         zone: z,
         severity: Math.min(3, Math.max(1, levels[i] + 1)),
         title: 'Rapid build-up',
-        message: `Zone ${z} density rising fast — ${pct}% increase in ${s.surgeWindow}s. Consider opening exit gate ${gateFor(i)}.`,
-        why: `Surge rule: ${z} went from ${from} to ${to} people (+${pct}%) in ${s.surgeWindow}s — above the trigger of +${s.surgePct}% and at least +${s.surgeMin} people. A surge bumps overall risk up one level.`,
+        message: `Zone ${z} density rising fast: up ${pct}% in ${s.surgeWindow}s. Consider opening exit gate ${gateFor(i)}.`,
+        why: `Surge rule: ${z} went from ${from} to ${to} people (+${pct}%) in ${s.surgeWindow}s, above the trigger of +${s.surgePct}% and at least +${s.surgeMin} people. A surge bumps overall risk up one level.`,
       })
       this.surgeLastAt[i] = t
     })
@@ -262,7 +262,7 @@ export function emptySnapshot() {
     overall: 0,
     score: 0,
     people: 0,
-    topZone: { name: '—', count: 0, level: 0 },
+    topZone: { name: '-', count: 0, level: 0 },
     surgingZones: [],
     alerts: [],
     timeline: [],

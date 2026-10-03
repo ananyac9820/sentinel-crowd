@@ -1,9 +1,8 @@
-import { Zap } from 'lucide-react'
 import { LEVELS, zoneName } from '../lib/risk.js'
 
-const FILL = ['14', '30', '42', '55'] // hex alpha per level
+const FILL = ['00', '33', '47', '5c'] // hex alpha per level
 
-// Semi-transparent 4×3 density overlay drawn on top of the camera feed.
+// Semi-transparent 4x3 density overlay drawn on top of the camera feed.
 export default function ZoneGrid({ snap }) {
   return (
     <div className="pointer-events-none absolute inset-0 grid grid-cols-4 grid-rows-3">
@@ -14,14 +13,14 @@ export default function ZoneGrid({ snap }) {
           <div
             key={i}
             className="relative border transition-colors duration-700"
-            style={{ background: `${color}${FILL[l]}`, borderColor: `${color}${l ? '88' : '33'}` }}
+            style={{ background: `${color}${FILL[l]}`, borderColor: l ? `${color}aa` : '#ffffff1f' }}
           >
             <span
-              className="absolute left-1.5 bottom-1.5 inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-bold backdrop-blur-sm transition-colors duration-700"
-              style={{ background: '#07090ecc', color: l ? color : '#cbd5e1' }}
+              className="num absolute bottom-1 left-1 flex items-center gap-1.5 px-1.5 py-px text-[11px] font-medium"
+              style={{ background: '#1b1e22e6', color: l ? color : '#d9dde1', borderRadius: 2 }}
             >
-              {zoneName(i)} <span className="num font-mono">{c}</span>
-              {snap.surges[i] && <Zap size={11} className="text-warn blink" />}
+              {zoneName(i)} <span className="font-semibold">{c}</span>
+              {snap.surges[i] && <span className="text-[9px] font-semibold tracking-wider text-warn">SURGE</span>}
             </span>
           </div>
         )
