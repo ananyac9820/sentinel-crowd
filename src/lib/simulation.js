@@ -7,7 +7,7 @@ export const INTERVENTION_AT = 66
 
 export const PHASES = [
   { t: 0, label: 'Normal evening flow' },
-  { t: 18, label: 'Train delay announced — platform filling' },
+  { t: 18, label: 'Train delay announced, platform filling' },
   { t: 36, label: 'Crowd funnelling toward staircase (B3)' },
   { t: 52, label: 'Crush risk at staircase' },
   { t: INTERVENTION_AT, label: 'Intervention: Gate 2 opened, entry paused' },
@@ -55,4 +55,17 @@ export function phaseAt(t) {
   let p = PHASES[0]
   for (const ph of PHASES) if (t >= ph.t) p = ph
   return p
+}
+
+export const INTERVENTION = {
+  message: 'Station control opened exit gate 2 and paused entry to Platform 2. Officers are moving people away from the staircase.',
+  why: 'Operator action logged by the control room in response to the CRITICAL alert. This is not a model rule.',
+}
+
+// Runs one simulation tick against an engine and logs the intervention when its time is crossed.
+export function stepSimulation(engine, prevT, t, wall) {
+  const counts = simCounts(t)
+  engine.step(counts, t, wall)
+  if (prevT < INTERVENTION_AT && t >= INTERVENTION_AT) engine.addEvent(INTERVENTION.message, INTERVENTION.why, wall)
+  return { counts, snap: engine.snapshot }
 }

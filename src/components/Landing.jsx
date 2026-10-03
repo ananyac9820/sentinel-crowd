@@ -1,79 +1,133 @@
-import { ArrowRight, Eye, TrendingUp, BellRing } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 import Logo from './Logo.jsx'
 import Footer from './Footer.jsx'
-import { LEVELS } from '../lib/risk.js'
+import StatusCard from './StatusCard.jsx'
+import AlertsFeed from './AlertsFeed.jsx'
+import SimulatedFeed from './SimulatedFeed.jsx'
+import ZoneGrid from './ZoneGrid.jsx'
+import { CrowdEngine, DEFAULT_SETTINGS, ZONE_COUNT } from '../lib/risk.js'
+import { stepSimulation, SIM_DURATION } from '../lib/simulation.js'
 
-// Static preview grid for the hero: a platform with one zone heating up.
-const PREVIEW = [0, 0, 1, 0, 0, 1, 3, 0, 0, 1, 2, 0]
+const STEPS = [
+  [
+    'Connect a camera.',
+    'Use an existing CCTV feed or a recorded clip. The video is processed in the browser and never leaves the device.',
+  ],
+  ['Count people in each zone.', 'The view is split into a 4x3 grid. A person detection model counts the people in each zone twice a second.'],
+  [
+    'Check two simple rules.',
+    'A zone is flagged when its count passes a set threshold, or when it rises quickly within 20 seconds.',
+  ],
+  [
+    'Tell the operator what to do.',
+    'Each alert names the zone, the severity and a suggested action, such as opening a specific exit gate.',
+  ],
+]
 
 export default function Landing({ onOpen }) {
   return (
-    <div className="min-h-full flex flex-col bg-[radial-gradient(ellipse_at_top_right,rgba(99,102,241,0.12),transparent_55%)]">
-      <header className="mx-auto w-full max-w-6xl px-6 pt-6 flex items-center gap-3">
-        <Logo />
-        <span className="font-semibold tracking-tight">Sentinel Crowd</span>
-        <span className="ml-auto text-xs text-slate-500">CuriousPARC 2026 · Behaviour analysis</span>
+    <div className="flex min-h-full flex-col">
+      <header className="border-b border-line">
+        <div className="mx-auto flex h-12 w-full max-w-[1200px] items-center gap-2.5 px-6">
+          <Logo />
+          <span className="font-semibold">Sentinel Crowd</span>
+          <span className="ml-auto text-[12px] text-dim">CuriousPARC 2026, Theme 3</span>
+        </div>
       </header>
 
-      <main className="flex-1 mx-auto w-full max-w-6xl px-6 py-12 grid gap-12 lg:grid-cols-[1.15fr_1fr] items-center">
-        <div>
-          <p className="label !text-accent-soft mb-4">Crowd-crush early warning</p>
-          <h1 className="text-4xl sm:text-5xl xl:text-6xl font-extrabold tracking-tight leading-[1.05]">
-            See a stampede forming
-            <br />
-            <span className="text-slate-400">before it happens.</span>
-          </h1>
-          <p className="mt-6 text-lg text-slate-400 max-w-xl leading-relaxed">
-            Sentinel Crowd watches existing CCTV, measures crowd density zone by zone, and alerts police and event
-            organisers the moment pressure starts building — at stations, temples and festivals.
-          </p>
-          <button
-            onClick={onOpen}
-            className="mt-9 inline-flex items-center gap-2 rounded-xl bg-accent px-6 py-3.5 font-semibold text-white shadow-lg shadow-indigo-900/40 transition hover:bg-indigo-500 hover:gap-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-soft"
-          >
-            Open Live Dashboard <ArrowRight size={18} />
-          </button>
+      <main className="mx-auto w-full max-w-[1200px] flex-1 px-6">
+        <section className="grid items-start gap-8 py-8 lg:grid-cols-[340px_minmax(0,1fr)]">
+          <div className="lg:pt-6">
+            <h1 className="text-[32px] font-semibold leading-tight">Sentinel Crowd</h1>
+            <p className="mt-3 text-[16px] leading-relaxed text-muted">
+              Sentinel Crowd counts people in each part of a CCTV view and warns station or event staff when an area is
+              becoming dangerously crowded.
+            </p>
+            <p className="mt-3 text-[13px] leading-relaxed text-dim">
+              Built for railway platforms, temples and festivals, where crushes build up over minutes before anyone on
+              the ground can see them.
+            </p>
+            <button onClick={onOpen} className="btn btn-primary mt-6 h-10 px-5 text-[14px]">
+              Open dashboard
+            </button>
+          </div>
+          <LivePreview />
+        </section>
 
-          <div className="mt-12 grid sm:grid-cols-3 gap-5 max-w-2xl">
-            {[
-              [Eye, 'Watches CCTV', 'Counts people per zone in the browser.'],
-              [TrendingUp, 'Spots surges', 'Flags rapid build-ups, not just full zones.'],
-              [BellRing, 'Says what to do', 'Plain-English alerts with an action.'],
-            ].map(([Icon, title, text]) => (
-              <div key={title}>
-                <Icon size={18} className="text-accent-soft" />
-                <p className="mt-2 font-semibold text-sm">{title}</p>
-                <p className="text-sm text-slate-500 leading-snug">{text}</p>
-              </div>
+        <section className="border-t border-line py-8">
+          <h2 className="label">How it works</h2>
+          <ol className="mt-4 grid gap-x-10 gap-y-5 md:grid-cols-2">
+            {STEPS.map(([title, body], i) => (
+              <li key={title} className="grid grid-cols-[32px_1fr] gap-2">
+                <span className="num text-[15px] text-accent">{String(i + 1).padStart(2, '0')}</span>
+                <p className="text-[14px] leading-relaxed text-muted">
+                  <span className="font-semibold text-fg">{title}</span> {body}
+                </p>
+              </li>
             ))}
-          </div>
-        </div>
-
-        <div className="card p-4 hidden lg:block">
-          <div className="flex items-center justify-between mb-3">
-            <span className="label">CAM-03 · Platform 2</span>
-            <span className="text-xs font-bold rounded-md px-2 py-0.5" style={{ background: '#ef444422', color: '#ef4444' }}>
-              CRITICAL
-            </span>
-          </div>
-          <div className="grid grid-cols-4 gap-1.5 aspect-video">
-            {PREVIEW.map((l, i) => (
-              <div
-                key={i}
-                className="rounded-md border"
-                style={{ background: `${LEVELS[l].color}${l ? '40' : '1a'}`, borderColor: `${LEVELS[l].color}55` }}
-              />
-            ))}
-          </div>
-          <div className="mt-3 rounded-lg bg-ink-800 border-l-2 border-crit px-3 py-2 text-sm text-slate-300">
-            Zone B3 density rising fast — 40% increase in 20s. Consider opening exit gate 2.
-          </div>
-        </div>
+          </ol>
+        </section>
       </main>
 
-      <footer className="mx-auto w-full max-w-6xl px-6 pb-6">
+      <div className="mx-auto w-full max-w-[1200px] border-t border-line px-6 py-4">
         <Footer />
-      </footer>
+      </div>
     </div>
+  )
+}
+
+// A scaled-down copy of the real dashboard, running the same simulation and risk engine.
+const PREVIEW_START = 30 // skip the quiet first half-minute so visitors see the build-up sooner
+
+function LivePreview() {
+  const countsRef = useRef(Array(ZONE_COUNT).fill(0))
+  const [snap, setSnap] = useState(null)
+
+  useEffect(() => {
+    let engine, t, wallStart
+    const start = () => {
+      engine = new CrowdEngine(DEFAULT_SETTINGS.sim)
+      wallStart = Date.now() - PREVIEW_START * 1000
+      for (t = 0; t < PREVIEW_START; t += 0.5) stepSimulation(engine, t - 0.5, t, wallStart + t * 1000)
+    }
+    start()
+    const id = setInterval(() => {
+      const prev = t
+      t += 0.5
+      if (t > SIM_DURATION + 6) {
+        start()
+        return
+      }
+      const r = stepSimulation(engine, prev, t, wallStart + t * 1000)
+      countsRef.current = r.counts
+      setSnap({ ...r.snap, alerts: r.snap.alerts.slice(0, 4) })
+    }, 500)
+    return () => clearInterval(id)
+  }, [])
+
+  return (
+    <figure className="panel overflow-hidden" aria-label="Live preview of the dashboard running the simulation scenario">
+      <div className="panel-head">
+        <span className="label">Live preview</span>
+        <span className="text-[12px] text-muted">Simulation scenario, Platform 2</span>
+      </div>
+      {snap ? (
+        <div className="grid gap-2 p-2">
+          <StatusCard snap={snap} />
+          <div className="grid gap-2 md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+            <div className="relative aspect-video overflow-hidden bg-[#17191c]" style={{ borderRadius: 2 }}>
+              <SimulatedFeed countsRef={countsRef} running />
+              <ZoneGrid snap={snap} />
+            </div>
+            <AlertsFeed alerts={snap.alerts} className="!min-h-0 max-md:h-48" />
+          </div>
+        </div>
+      ) : (
+        <div className="grid gap-2 p-2" aria-busy="true">
+          <div className="skel h-[52px]" />
+          <div className="skel aspect-video" />
+        </div>
+      )}
+    </figure>
   )
 }

@@ -18,7 +18,7 @@ async function loadModel(onStatus) {
       return { model: await cocoSsd.load({ base: BASE, modelUrl: CACHE_URL }), cached: true, backend: tf.getBackend() }
     }
   } catch {
-    // Cache unavailable or corrupt — fall through to a network load.
+    // Cache unavailable or corrupt, so fall through to a network load.
   }
 
   onStatus?.('Downloading AI model (first time only)…')

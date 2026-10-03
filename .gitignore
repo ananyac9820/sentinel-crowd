@@ -33,3 +33,6 @@ $RECYCLE.BIN/
 .claude/
 .vercel/
 .netlify/
+
+# Low-resolution review screenshots
+screenshots/

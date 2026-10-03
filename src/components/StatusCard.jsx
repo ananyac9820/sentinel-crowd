@@ -1,65 +1,72 @@
-import { Users, MapPin, Gauge, Zap } from 'lucide-react'
 import { LEVELS } from '../lib/risk.js'
 
 const ADVICE = [
-  'All zones within safe density.',
-  'Crowd building — keep watching.',
-  'Congestion — divert flow now.',
-  'Crush risk — open exits, halt entry.',
+  'All zones are within safe density.',
+  'Crowd is building. Keep watching the flagged zones.',
+  'Congestion. Divert people away from the flagged zones now.',
+  'Crush risk. Open exits and stop entry immediately.',
 ]
 
+// Full-width status bar. Tinted at WATCH and WARNING, solid critical colour at CRITICAL.
 export default function StatusCard({ snap }) {
   const lvl = LEVELS[snap.overall]
-  const top = LEVELS[snap.topZone.level]
+  const critical = snap.overall === 3
+  const bg = critical ? lvl.color : snap.overall ? `${lvl.color}2b` : 'var(--color-panel)'
+  const ink = critical ? '#f4f1ee' : undefined
+  const sub = critical ? '#f4f1eecc' : undefined
 
   return (
-    <section className="card px-3.5 py-3 transition-colors duration-700" style={{ borderColor: `${lvl.color}55` }}>
-      <div className="flex items-center justify-between">
-        <span className="label">Overall risk</span>
-        {snap.surgingZones.length > 0 && (
-          <span className="inline-flex items-center gap-1 rounded-md bg-warn/15 px-2 py-0.5 text-[11px] font-semibold text-warn">
-            <Zap size={12} /> Surge in {snap.surgingZones.join(', ')}
-          </span>
-        )}
-      </div>
-
-      <div className="mt-2 flex items-center gap-4">
-        <div
-          className="rounded-xl px-4 py-2 text-3xl xl:text-4xl font-black tracking-tight transition-all duration-700"
-          style={{ background: `${lvl.color}1f`, color: lvl.color, boxShadow: `0 0 0 1px ${lvl.color}55, 0 0 28px -6px ${lvl.color}` }}
-        >
-          {lvl.label}
+    <section
+      className="flex flex-wrap items-stretch border transition-colors duration-1000"
+      style={{ background: bg, borderColor: snap.overall ? lvl.color : 'var(--color-line)', borderRadius: 3 }}
+      aria-live="polite"
+    >
+      <div className="flex min-w-0 flex-1 items-center gap-4 px-4 py-2">
+        <div>
+          <div className="label" style={{ color: sub }}>
+            Overall risk
+          </div>
+          <div
+            className="num text-[26px] font-semibold leading-8 tracking-wide transition-colors duration-1000"
+            style={{ color: critical ? ink : lvl.color }}
+          >
+            {lvl.label}
+          </div>
         </div>
-        <p className="text-sm text-slate-400 leading-snug">{ADVICE[snap.overall]}</p>
+        <p className="min-w-0 text-[13px] leading-snug text-muted" style={{ color: sub }}>
+          {ADVICE[snap.overall]}
+        </p>
       </div>
 
-      <div className="mt-3 grid grid-cols-3 gap-2">
-        <Stat icon={Users} label="People" value={snap.people} />
+      <dl className="flex divide-x">
+        <Stat label="People" value={snap.people} ink={ink} sub={sub} />
         <Stat
-          icon={MapPin}
           label="Busiest zone"
-          value={snap.topZone.name}
-          sub={`${snap.topZone.count} ppl`}
-          color={snap.topZone.count ? top.color : undefined}
+          value={snap.topZone.count ? `${snap.topZone.name} ${snap.topZone.count}` : '-'}
+          ink={ink}
+          sub={sub}
         />
-        <Stat icon={Gauge} label="Risk score" value={snap.score} sub="/100" color={snap.score >= 75 ? LEVELS[3].color : undefined} />
-      </div>
+        <Stat label="Risk score" value={snap.score} unit="/100" ink={ink} sub={sub} />
+        <Stat label="Surge" value={snap.surgingZones.length ? snap.surgingZones.join(' ') : 'None'} ink={ink} sub={sub} small />
+      </dl>
     </section>
   )
 }
 
-function Stat({ icon: Icon, label, value, sub, color }) {
+function Stat({ label, value, unit, ink, sub, small }) {
   return (
-    <div className="rounded-lg bg-ink-850 border border-white/5 px-3 py-1.5">
-      <div className="flex items-center gap-1 text-[11px] text-slate-500">
-        <Icon size={12} /> {label}
-      </div>
-      <div className="mt-0.5 flex items-baseline gap-1">
-        <span className="num text-2xl font-bold transition-colors duration-500" style={{ color }}>
-          {value}
-        </span>
-        {sub && <span className="text-xs text-slate-500">{sub}</span>}
-      </div>
+    <div className="flex min-w-[96px] flex-col justify-center px-4 py-2" style={{ borderColor: ink ? '#f4f1ee40' : 'var(--color-line)' }}>
+      <dt className="label" style={{ color: sub }}>
+        {label}
+      </dt>
+      <dd className={`num font-semibold leading-7 ${small ? 'text-[15px]' : 'text-[22px]'}`} style={{ color: ink }}>
+        {value}
+        {unit && (
+          <span className="ml-0.5 text-[12px] font-normal text-muted" style={{ color: sub }}>
+            {unit}
+          </span>
+        )}
+      </dd>
     </div>
   )
 }
