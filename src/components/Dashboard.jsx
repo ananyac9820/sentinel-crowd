@@ -111,10 +111,10 @@ export default function Dashboard({ onHome }) {
       className="flex h-full flex-col border-2 transition-colors duration-[1500ms] max-lg:overflow-y-auto lg:overflow-hidden"
       style={{ borderColor: critical ? 'var(--color-crit)' : 'var(--color-bg)' }}
     >
-      <header className="flex flex-wrap items-center gap-3 border-b border-line bg-panel px-3 py-1.5">
-        <button onClick={onHome} className="flex items-center gap-2 text-fg hover:text-white" title="Back to home page">
+      <header className="flex flex-wrap items-center gap-3 border-b-[3px] border-line-strong bg-panel px-3 py-1.5">
+        <button onClick={onHome} className="flex items-center gap-2 text-fg hover:text-black" title="Back to home page">
           <Logo size={20} />
-          <span className="font-semibold">Sentinel Crowd</span>
+          <span className="font-bold">Sentinel Crowd</span>
         </button>
         <span className="hidden h-4 w-px bg-line sm:block" />
         <span className="hidden text-[13px] text-muted sm:inline">Crowd safety control</span>
@@ -130,7 +130,7 @@ export default function Dashboard({ onHome }) {
               aria-selected={mode === key}
               onClick={() => switchMode(key)}
               className={`h-7 px-3 text-[12px] font-medium transition-colors ${
-                mode === key ? 'bg-accent text-[#f3f5f7]' : 'bg-raised text-muted hover:text-fg'
+                mode === key ? 'bg-accent text-[#f6f5f1]' : 'bg-raised text-muted hover:text-fg'
               }`}
             >
               {label}

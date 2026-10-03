@@ -63,11 +63,11 @@ export default function LegalPage({ page }) {
   const p = PAGES[page]
   return (
     <div className="min-h-full flex flex-col">
-      <header className="border-b border-line">
+      <header className="border-b-[3px] border-line-strong bg-panel">
         <div className="mx-auto flex h-12 w-full max-w-3xl items-center gap-2.5 px-6">
-          <a href="#" className="flex items-center gap-2.5 text-fg hover:text-white">
+          <a href="#" className="flex items-center gap-2.5 text-fg hover:text-black">
             <Logo />
-            <span className="font-semibold">Sentinel Crowd</span>
+            <span className="font-bold">Sentinel Crowd</span>
           </a>
           <a href="#dashboard" className="link ml-auto text-sm">
             Open dashboard
@@ -75,12 +75,12 @@ export default function LegalPage({ page }) {
         </div>
       </header>
       <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-10">
-        <h1 className="text-2xl font-semibold">{p.title}</h1>
+        <h1 className="text-2xl font-bold">{p.title}</h1>
         <p className="mt-1 text-sm text-dim">Last updated {UPDATED}</p>
         <div className="mt-8 divide-y divide-line border-y border-line">
           {p.sections.map(([h, body]) => (
             <section key={h} className="grid gap-1 py-4 sm:grid-cols-[200px_1fr] sm:gap-6">
-              <h2 className="text-sm font-semibold text-fg">{h}</h2>
+              <h2 className="text-sm font-bold text-fg">{h}</h2>
               <p className="text-sm leading-relaxed text-muted">{body}</p>
             </section>
           ))}

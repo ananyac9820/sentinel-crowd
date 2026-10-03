@@ -20,12 +20,12 @@ const zoneBounds = (i) => {
 const rand = (a, b) => a + Math.random() * (b - a)
 
 function drawBackground(ctx, W, H) {
-  ctx.fillStyle = '#202326'
+  ctx.fillStyle = '#f6f5f1'
   ctx.fillRect(0, 0, W, H)
   // Tracks along the top edge
-  ctx.fillStyle = '#17191c'
+  ctx.fillStyle = '#dedcd5'
   ctx.fillRect(0, 0, W, H * 0.06)
-  ctx.strokeStyle = '#4a4f55'
+  ctx.strokeStyle = '#7d7b74'
   ctx.lineWidth = Math.max(1, W / 600)
   for (const y of [0.018, 0.042]) {
     ctx.beginPath()
@@ -34,7 +34,7 @@ function drawBackground(ctx, W, H) {
     ctx.stroke()
   }
   // Yellow tactile safety line
-  ctx.strokeStyle = '#8f7a3a99'
+  ctx.strokeStyle = '#b8932acc'
   ctx.setLineDash([W / 120, W / 160])
   ctx.lineWidth = Math.max(1.5, W / 400)
   ctx.beginPath()
@@ -43,7 +43,7 @@ function drawBackground(ctx, W, H) {
   ctx.stroke()
   ctx.setLineDash([])
   // Floor tiles
-  ctx.strokeStyle = '#ffffff08'
+  ctx.strokeStyle = '#0000000d'
   ctx.lineWidth = 1
   for (let x = 0; x <= W; x += W / 24) {
     ctx.beginPath()
@@ -58,7 +58,7 @@ function drawBackground(ctx, W, H) {
     ctx.stroke()
   }
   // Pillars
-  ctx.fillStyle = '#2b2f34'
+  ctx.fillStyle = '#bdbbb4'
   const p = W / 70
   for (const x of [0.25, 0.5, 0.75]) for (const y of [0.33, 0.66]) ctx.fillRect(W * x - p / 2, H * y - p / 2, p, p)
   // Staircase near zone C3
@@ -66,9 +66,9 @@ function drawBackground(ctx, W, H) {
     sy = H * 0.86,
     sw = W * 0.13,
     sh = H * 0.14
-  ctx.fillStyle = '#26292d'
+  ctx.fillStyle = '#e4e2dc'
   ctx.fillRect(sx, sy, sw, sh)
-  ctx.strokeStyle = '#3a3f45'
+  ctx.strokeStyle = '#a5a39c'
   for (let i = 1; i < 7; i++) {
     ctx.beginPath()
     ctx.moveTo(sx, sy + (sh * i) / 7)
@@ -76,15 +76,15 @@ function drawBackground(ctx, W, H) {
     ctx.stroke()
   }
   // Gates on the bottom edge
-  ctx.font = `600 ${Math.max(9, W / 85)}px 'IBM Plex Mono', monospace`
+  ctx.font = `700 ${Math.max(9, W / 85)}px 'IBM Plex Mono', monospace`
   ctx.textAlign = 'center'
   GATES.forEach((gx, i) => {
-    ctx.fillStyle = '#4a7fab55'
+    ctx.fillStyle = '#111111'
     ctx.fillRect(W * gx - W * 0.045, H - H * 0.012, W * 0.09, H * 0.012)
-    ctx.fillStyle = '#7fa3c2'
+    ctx.fillStyle = '#111111'
     ctx.fillText(`GATE ${i + 1}`, W * gx, H - H * 0.025)
   })
-  ctx.fillStyle = '#7a8189'
+  ctx.fillStyle = '#55534d'
   ctx.fillText('STAIRS', sx + sw / 2, sy - H * 0.012)
 }
 
@@ -152,11 +152,11 @@ export default function SimulatedFeed({ countsRef, running }) {
       const s = W / 900
       const draw = (a) => {
         ctx.globalAlpha = a.alpha
-        ctx.fillStyle = '#c9cdd1'
+        ctx.fillStyle = '#161616'
         ctx.beginPath()
         ctx.arc(a.x * W, a.y * H, 3.4 * s, 0, Math.PI * 2)
         ctx.fill()
-        ctx.strokeStyle = 'rgba(201,205,209,0.35)'
+        ctx.strokeStyle = 'rgba(0,0,0,0.3)'
         ctx.lineWidth = Math.max(1, s)
         ctx.strokeRect(a.x * W - 6 * s, a.y * H - 8 * s, 12 * s, 16 * s)
       }
