@@ -17,7 +17,7 @@ export default function CameraPanel({ mode, snap, countsRef, motionRef, sim, liv
         <span className="num truncate text-[13px] text-fg">
           {mode === 'sim' ? 'CAM-03 Platform 2, Central Junction' : live?.title || 'No source selected'}
         </span>
-        <span className="num border border-line px-1.5 text-[10px] tracking-wider text-muted" style={{ borderRadius: 2 }}>
+        <span className="num shrink-0 whitespace-nowrap border border-line px-1.5 text-[10px] tracking-wider text-muted" style={{ borderRadius: 2 }}>
           {mode === 'sim' ? 'SIMULATED' : 'AI DETECTION'}
         </span>
         <div className="ml-auto flex items-center gap-1.5">{mode === 'sim' ? <SimControls sim={sim} /> : live?.controls}</div>

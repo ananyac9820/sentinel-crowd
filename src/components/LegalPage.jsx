@@ -17,7 +17,7 @@ const PAGES = {
       ],
       [
         'What the model does',
-        'The model draws a box around each person it finds and the app counts how many boxes fall in each zone. It does not identify people, read faces, estimate age or gender, or track individuals across frames.',
+        'The model draws a box around each person it finds and the app counts how many boxes fall in each zone. To measure which way the crowd is moving, each box is followed for a few seconds using only its position on screen; these short-lived anonymous tracks are discarded straight away. The app does not identify people, read faces, estimate age or gender, or follow anyone over time.',
       ],
       [
         'What is stored',

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { UploadIcon, PlayIcon, PauseIcon, AlertIcon } from '../components/Icons.jsx'
 import { getDetector } from '../lib/detector.js'
+import { Tracker } from '../lib/tracker.js'
 
 const DETECT_MS = 500
 const SLOW_LOAD_MS = 60000
@@ -54,41 +55,18 @@ function FeedSkeleton({ message, action }) {
   )
 }
 
-// Simple tracking: match each person to the nearest person in the previous frame (greedy,
-// closest pairs first) and estimate their velocity in frame heights per second.
-const MAX_MATCH = 0.12 // frame heights a person can move between samples
-function trackVelocities(people, prev, now, aspect) {
-  if (!prev || !prev.people.length) return
-  const dt = now - prev.t
-  if (dt <= 0 || dt > 2) return
-  const pairs = []
-  people.forEach((p, i) =>
-    prev.people.forEach((q, j) => {
-      const d = Math.hypot((p.x - q.x) * aspect, p.y - q.y)
-      if (d <= MAX_MATCH) pairs.push({ i, j, d })
-    }),
-  )
-  pairs.sort((a, b) => a.d - b.d)
-  const usedI = new Set()
-  const usedJ = new Set()
-  for (const { i, j } of pairs) {
-    if (usedI.has(i) || usedJ.has(j)) continue
-    usedI.add(i)
-    usedJ.add(j)
-    people[i].vx = ((people[i].x - prev.people[j].x) * aspect) / dt
-    people[i].vy = (people[i].y - prev.people[j].y) / dt
-  }
-}
-
 // Live Detection: COCO-SSD person detection on an uploaded video or webcam, sampled every
 // 500 ms. Reports each person's position (0..1) and, when tracked, their velocity.
-export default function useLiveDetection({ active, onPeople, onSwitchToSim }) {
+export default function useLiveDetection({ active, onPeople, onSourceChange, onSwitchToSim }) {
   const videoRef = useRef(null)
   const fileRef = useRef(null)
   const streamRef = useRef(null)
-  const prevRef = useRef(null)
+  const trackerRef = useRef(null)
+  if (!trackerRef.current) trackerRef.current = new Tracker()
   const onPeopleRef = useRef(onPeople)
   onPeopleRef.current = onPeople
+  const onSourceChangeRef = useRef(onSourceChange)
+  onSourceChangeRef.current = onSourceChange
 
   const [model, setModel] = useState(null)
   const [modelInfo, setModelInfo] = useState(null)
@@ -152,7 +130,8 @@ export default function useLiveDetection({ active, onPeople, onSwitchToSim }) {
   useEffect(() => {
     const v = videoRef.current
     setBoxes([])
-    prevRef.current = null
+    trackerRef.current.reset()
+    if (active) onSourceChangeRef.current?.() // a new camera starts a fresh analysis
     setFeedError(null)
     setPaused(false)
     const src = sourcesRef.current.find((s) => s.id === sourceId)
@@ -209,18 +188,17 @@ export default function useLiveDetection({ active, onPeople, onSwitchToSim }) {
         if (stopped) return
         const W = v.videoWidth
         const H = v.videoHeight
-        const now = performance.now() / 1000
         const bx = []
-        const people = []
+        const points = []
         for (const p of preds) {
           if (p.class !== 'person') continue
           const [rawX, y, w, h] = p.bbox
           const x = mirrored ? W - rawX - w : rawX
           bx.push({ x: x / W, y: y / H, w: w / W, h: h / H })
-          people.push({ x: (x + w / 2) / W, y: (y + h / 2) / H })
+          points.push({ x: (x + w / 2) / W, y: (y + h / 2) / H })
         }
-        trackVelocities(people, prevRef.current, now, W / H)
-        prevRef.current = { t: now, people }
+        // Video time, so slow frames and pauses don't distort speeds.
+        const people = trackerRef.current.update(points, v.currentTime, W / H)
         setBoxes(bx)
         onPeopleRef.current(people)
       } catch (e) {
@@ -275,13 +253,13 @@ export default function useLiveDetection({ active, onPeople, onSwitchToSim }) {
   const controls = (
     <>
       {fileInput}
-      <span className="num hidden text-[11px] text-dim xl:inline" title={modelInfo ? `Backend: ${modelInfo.backend}` : undefined}>
+      <span className="num hidden whitespace-nowrap text-[11px] text-dim 2xl:inline" title={modelInfo ? `Backend: ${modelInfo.backend}` : undefined}>
         {ready ? (modelInfo?.cached ? 'Model ready, cached' : 'Model ready') : status === 'loading' ? 'Loading model' : 'Model not loaded'}
       </span>
       <select
         value={sourceId ?? ''}
         onChange={(e) => setSourceId(e.target.value || null)}
-        className="h-7 max-w-[200px] border border-line-strong bg-raised px-1.5 text-[12px] text-fg"
+        className="h-7 max-w-[180px] border border-line-strong bg-raised px-1.5 text-[12px] text-fg"
         style={{ borderRadius: 2 }}
         aria-label="Camera source"
       >
@@ -293,8 +271,8 @@ export default function useLiveDetection({ active, onPeople, onSwitchToSim }) {
         ))}
       </select>
       {current?.kind === 'file' && (
-        <button className="btn w-7 justify-center px-0" onClick={togglePlay} aria-label={paused ? 'Play' : 'Pause'}>
-          {paused ? <PlayIcon size={12} /> : <PauseIcon size={12} />}
+        <button className="btn w-[70px] justify-center" onClick={togglePlay}>
+          {paused ? <PlayIcon size={12} /> : <PauseIcon size={12} />} {paused ? 'Play' : 'Pause'}
         </button>
       )}
       {upload(false)}

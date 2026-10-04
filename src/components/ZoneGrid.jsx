@@ -37,7 +37,7 @@ export default function ZoneGrid({ snap, aspect = 16 / 9, showFlow = true }) {
               className="num absolute bottom-1 left-1 flex max-w-[calc(100%-8px)] items-center gap-1.5 overflow-hidden whitespace-nowrap px-1.5 py-px text-[11px] font-bold"
               style={{ background: '#f6f5f1ee', color: l ? color : '#111111', borderRadius: 2 }}
             >
-              <span className="truncate">{z.name}</span> <span>{snap.counts[i]}</span>
+              <span className={z.name.length > 4 ? 'truncate' : 'shrink-0'}>{z.name}</span> <span>{snap.counts[i]}</span>
               {tag}
             </span>
           </div>

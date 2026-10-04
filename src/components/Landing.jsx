@@ -16,12 +16,12 @@ const STEPS = [
   ],
   ['Count people in each zone.', 'The view is split into a 4x3 grid. A person detection model counts the people in each zone twice a second.'],
   [
-    'Check the rules and forecast.',
-    'A zone is flagged when its count passes a set threshold or rises quickly within 20 seconds. Its growth rate is projected forward to show how many seconds remain before it reaches crush density.',
+    'Read the crowd, not just the count.',
+    'A zone is flagged when it is too dense, filling too fast, or when people are being pushed in different directions (turbulence) or moving against each other (counter-flow). Its growth is projected forward to show how many seconds remain before it reaches crush density.',
   ],
   [
     'Tell the operator what to do.',
-    'Each alert names the zone, the severity and a suggested action, such as opening a specific exit gate.',
+    'Each alert names the zone and a suggested action, such as opening a specific exit gate. Staff can try an action and see on the station map where the crowd goes next.',
   ],
 ]
 
