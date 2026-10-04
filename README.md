@@ -2,7 +2,7 @@
 
 AI early warning for crowd crushes using existing CCTV cameras.
 
-Sentinel Crowd splits a camera view into 12 zones, counts people in each zone, and raises plain-language alerts when a zone becomes too dense or fills up too quickly. It was built for CuriousPARC 2026, Theme 3: Computer Vision, Behaviour Analysis and Scene Understanding.
+Sentinel Crowd splits a camera view into 12 zones, counts people in each zone, and raises plain-language alerts when a zone becomes too dense or fills up too quickly. It also forecasts how many seconds remain before a filling zone reaches crush density, so staff can act before it happens. It was built for CuriousPARC 2026, Theme 3: Computer Vision, Behaviour Analysis and Scene Understanding.
 
 ## Run locally
 

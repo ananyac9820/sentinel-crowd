@@ -36,3 +36,6 @@ $RECYCLE.BIN/
 
 # Low-resolution review screenshots
 screenshots/
+
+# Demo video clips (Pexels, downloaded locally)
+demo-videos/

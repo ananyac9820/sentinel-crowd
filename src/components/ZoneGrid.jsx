@@ -16,11 +16,12 @@ export default function ZoneGrid({ snap }) {
             style={{ background: `${color}${FILL[l]}`, borderColor: l ? `${color}aa` : '#00000026' }}
           >
             <span
-              className="num absolute bottom-1 left-1 flex items-center gap-1.5 px-1.5 py-px text-[11px] font-bold"
+              className="num absolute bottom-1 left-1 flex items-center gap-1.5 whitespace-nowrap px-1.5 py-px text-[11px] font-bold"
               style={{ background: '#f6f5f1ee', color: l ? color : '#111111', borderRadius: 2 }}
             >
               {zoneName(i)} <span className="font-bold">{c}</span>
               {snap.surges[i] && <span className="text-[9px] font-bold tracking-wider text-warn">SURGE</span>}
+              {snap.forecast?.[i] != null && <span className="text-[10px] font-bold text-crit">CRIT ~{snap.forecast[i]}s</span>}
             </span>
           </div>
         )
