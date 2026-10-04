@@ -171,6 +171,8 @@ export default function useLiveDetection({ active, onCounts, onSwitchToSim }) {
     if (!active || !model || !sourceId) return
     let busy = false
     let stopped = false
+    // The webcam is shown mirrored like a video call, so mirror detections to match.
+    const mirrored = sourceId === WEBCAM.id
     const id = setInterval(async () => {
       const v = videoRef.current
       if (busy || !v || v.readyState < 2 || v.paused || v.ended || !v.videoWidth) return
@@ -184,7 +186,8 @@ export default function useLiveDetection({ active, onCounts, onSwitchToSim }) {
         const bx = []
         for (const p of preds) {
           if (p.class !== 'person') continue
-          const [x, y, w, h] = p.bbox
+          const [rawX, y, w, h] = p.bbox
+          const x = mirrored ? W - rawX - w : rawX
           const col = Math.min(COLS - 1, Math.max(0, Math.floor(((x + w / 2) / W) * COLS)))
           const row = Math.min(ROWS.length - 1, Math.max(0, Math.floor(((y + h / 2) / H) * ROWS.length)))
           counts[row * COLS + col]++
@@ -278,6 +281,7 @@ export default function useLiveDetection({ active, onCounts, onSwitchToSim }) {
         playsInline
         loop
         className="absolute inset-0 h-full w-full object-fill"
+        style={current?.kind === 'webcam' ? { transform: 'scaleX(-1)' } : undefined}
         onLoadedMetadata={(e) => e.target.videoWidth && setAspect(e.target.videoWidth / e.target.videoHeight)}
         onLoadedData={() => setVideoLoading(false)}
         onPlaying={() => setVideoLoading(false)}

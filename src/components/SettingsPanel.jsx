@@ -66,6 +66,7 @@ export default function SettingsPanel({ mode, value, onChange, onClose }) {
             <p>Each zone gets a level from its people count.</p>
             <p>A surge fires when a zone's count rises by the percentage and minimum number of people above, within the time window.</p>
             <p>Overall risk is the worst zone's level, raised by one level while any zone is surging.</p>
+            <p>The forecast fits a line to each flagged zone's count over the last 10 seconds and estimates when it will reach the CRITICAL threshold. A forecast alert fires when that is under 25 seconds away.</p>
           </div>
 
           <button onClick={() => onChange(DEFAULT_SETTINGS[mode])} className="btn mt-5">

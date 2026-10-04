@@ -56,6 +56,11 @@ const TIMELINE = 120 // seconds shown on the chart
 const SURGE_COOLDOWN = 30
 const ZONE_ALERT_COOLDOWN = 3
 const DOWNGRADE_HOLD = 3 // overall level must stay lower this long before easing
+const FORECAST_WINDOW = 10 // seconds of history used to estimate each zone's growth rate
+const FORECAST_MIN_RATE = 0.15 // people per second; slower growth is treated as steady
+const FORECAST_HORIZON = 60 // only show forecasts within this many seconds
+const FORECAST_ALERT_AT = 25 // raise a forecast alert when CRITICAL is this close
+const FORECAST_COOLDOWN = 30
 
 export class CrowdEngine {
   constructor(settings) {
@@ -69,6 +74,7 @@ export class CrowdEngine {
     this.zoneAlertLevel = Array(ZONE_COUNT).fill(0)
     this.zoneLastAlertAt = Array(ZONE_COUNT).fill(-1e9)
     this.surgeLastAt = Array(ZONE_COUNT).fill(-1e9)
+    this.forecastLastAt = Array(ZONE_COUNT).fill(-1e9)
     this.overall = 0
     this.downSince = null
     this.alerts = []
@@ -135,6 +141,29 @@ export class CrowdEngine {
       return d > tol ? 1 : d < -tol ? -1 : 0
     })
 
+    // Forecast: least-squares growth rate over the last FORECAST_WINDOW seconds,
+    // projected forward to when the zone would cross the CRITICAL threshold.
+    const win = this.smooth.filter((h) => h.t >= t - FORECAST_WINDOW)
+    const haveForecastWindow = win.length >= 6 && win[0].t <= t - FORECAST_WINDOW * 0.8
+    const rates = Array(ZONE_COUNT).fill(0)
+    const forecast = sm.map((cur, i) => {
+      if (!haveForecastWindow || cur >= s.critical || zoneLevel(Math.round(cur), s) < 1) return null
+      const n = win.length
+      const mt = win.reduce((a, h) => a + h.t, 0) / n
+      const mc = win.reduce((a, h) => a + h.counts[i], 0) / n
+      let num = 0
+      let den = 0
+      for (const h of win) {
+        num += (h.t - mt) * (h.counts[i] - mc)
+        den += (h.t - mt) ** 2
+      }
+      const rate = den ? num / den : 0
+      rates[i] = rate
+      if (rate < FORECAST_MIN_RATE || !(cur >= ref3[i] - 0.25)) return null
+      const eta = (s.critical - cur) / rate
+      return eta <= FORECAST_HORIZON ? Math.max(1, Math.round(eta)) : null
+    })
+
     const calmestNeighbour = (i) =>
       neighbours(i).reduce((best, j) => (shown[j] < shown[best] ? j : best), neighbours(i)[0])
 
@@ -179,6 +208,22 @@ export class CrowdEngine {
         why: `Surge rule: ${z} went from ${from} to ${to} people (+${pct}%) in ${s.surgeWindow}s, above the trigger of +${s.surgePct}% and at least +${s.surgeMin} people. A surge bumps overall risk up one level.`,
       })
       this.surgeLastAt[i] = t
+    })
+
+    // Forecast alerts: a zone is projected to reach CRITICAL soon.
+    forecast.forEach((eta, i) => {
+      if (eta === null || eta > FORECAST_ALERT_AT || levels[i] < 1 || t - this.forecastLastAt[i] < FORECAST_COOLDOWN) return
+      const z = zoneName(i)
+      const from = Math.round(win[0].counts[i])
+      this.pushAlert({
+        time: wall,
+        zone: z,
+        severity: Math.min(3, levels[i] + 1),
+        title: 'Forecast',
+        message: `Zone ${z} on course to reach crush density in about ${eta}s. Prepare to open exit gate ${gateFor(i)} and slow entry now.`,
+        why: `Forecast rule: ${z} grew from ${from} to ${shown[i]} people over the last ${FORECAST_WINDOW}s (about +${rates[i].toFixed(1)} people per second). At that rate it crosses the CRITICAL threshold of ${s.critical} in about ${eta}s. Forecast alerts fire when the projection is under ${FORECAST_ALERT_AT}s.`,
+      })
+      this.forecastLastAt[i] = t
     })
 
     // Overall risk = worst zone, bumped one level if any zone is surging.
@@ -234,7 +279,10 @@ export class CrowdEngine {
     }
 
     const top = shown.indexOf(Math.max(...shown))
+    const soonestIdx = forecast.reduce((best, eta, i) => (eta !== null && (best < 0 || eta < forecast[best]) ? i : best), -1)
     this.snapshot = {
+      forecast,
+      soonest: soonestIdx < 0 ? null : { name: zoneName(soonestIdx), eta: forecast[soonestIdx] },
       t,
       counts: shown,
       levels,
@@ -255,6 +303,8 @@ export class CrowdEngine {
 export function emptySnapshot() {
   return {
     t: 0,
+    forecast: Array(ZONE_COUNT).fill(null),
+    soonest: null,
     counts: Array(ZONE_COUNT).fill(0),
     levels: Array(ZONE_COUNT).fill(0),
     trends: Array(ZONE_COUNT).fill(0),

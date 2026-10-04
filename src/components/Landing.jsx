@@ -15,8 +15,8 @@ const STEPS = [
   ],
   ['Count people in each zone.', 'The view is split into a 4x3 grid. A person detection model counts the people in each zone twice a second.'],
   [
-    'Check two simple rules.',
-    'A zone is flagged when its count passes a set threshold, or when it rises quickly within 20 seconds.',
+    'Check the rules and forecast.',
+    'A zone is flagged when its count passes a set threshold or rises quickly within 20 seconds. Its growth rate is projected forward to show how many seconds remain before it reaches crush density.',
   ],
   [
     'Tell the operator what to do.',
