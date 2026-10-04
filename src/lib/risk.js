@@ -19,9 +19,10 @@ export const INFO_COLOR = '#111111'
 
 export const DEFAULT_SETTINGS = {
   // Simulation numbers are people per zone on a station platform.
-  sim: { watch: 8, warning: 13, critical: 18, surgePct: 35, surgeWindow: 20, surgeMin: 4, turbulence: 60, counterFlow: 55 },
+  sim: { watch: 8, warning: 13, critical: 18, surgePct: 35, surgeWindow: 20, surgeMin: 4, turbulence: 60, counterFlow: 55, smoothing: 1.5, spreadNoise: 0 },
   // A general detector finds far fewer people per frame, so live defaults are lower.
-  live: { watch: 3, warning: 5, critical: 8, surgePct: 50, surgeWindow: 20, surgeMin: 2, turbulence: 60, counterFlow: 55 },
+  // Live counts flicker more, so they are averaged longer and small movement jitter is ignored.
+  live: { watch: 3, warning: 5, critical: 8, surgePct: 50, surgeWindow: 20, surgeMin: 2, turbulence: 60, counterFlow: 55, smoothing: 3, spreadNoise: 0.02 },
 }
 
 export function zoneLevel(count, s) {
@@ -33,11 +34,12 @@ export function zoneLevel(count, s) {
 
 const thresholdFor = (level, s) => [0, s.watch, s.warning, s.critical][level]
 
-const SMOOTH_WINDOW = 1.5 // seconds, averages out detector flicker
+const SMOOTH_WINDOW = 1.5 // default seconds of averaging; settings.smoothing overrides it
 const HISTORY = 130 // seconds of history kept
 const TIMELINE = 120 // seconds shown on the chart
 const SURGE_COOLDOWN = 30
 const ZONE_ALERT_COOLDOWN = 3
+const LEVEL_REPEAT_GAP = 30 // seconds before the same zone can repeat the same level alert
 const DOWNGRADE_HOLD = 3 // overall level must stay lower this long before easing
 const FORECAST_WINDOW = 10 // seconds of history used to estimate each zone's growth rate
 const FORECAST_MIN_RATE = 0.15 // people per second; slower growth is treated as steady
@@ -66,6 +68,7 @@ export class CrowdEngine {
     this.smooth = []
     this.zoneAlertLevel = Array(n).fill(0)
     this.zoneLastAlertAt = Array(n).fill(-1e9)
+    this.zoneLastLevel = Array(n).fill(0) // level of the last level alert, to avoid repeats
     this.surgeLastAt = Array(n).fill(-1e9)
     this.forecastLastAt = Array(n).fill(-1e9)
     this.turbLastAt = Array(n).fill(-1e9)
@@ -118,7 +121,8 @@ export class CrowdEngine {
     while (this.raw.length && this.raw[0].t < t - HISTORY) this.raw.shift()
 
     // Smoothed counts over the last SMOOTH_WINDOW seconds.
-    const recent = this.raw.filter((h) => h.t >= t - SMOOTH_WINDOW)
+    const smoothWindow = s.smoothing ?? SMOOTH_WINDOW
+    const recent = this.raw.filter((h) => h.t >= t - smoothWindow)
     const sm = Array(n).fill(0)
     for (const h of recent) h.counts.forEach((c, i) => (sm[i] += c / recent.length))
     this.smooth.push({ t, counts: sm })
@@ -182,7 +186,13 @@ export class CrowdEngine {
     const mo = Z.map((_, i) => {
       const m = motion?.[i]
       const prev = this.motionEma[i]
-      if (!m) return (this.motionEma[i] = prev ? { ...prev, counter: prev.counter * (1 - MOTION_EMA) } : null)
+      if (!m) {
+        // No movement data this tick (e.g. nobody tracked): let the old reading fade out.
+        if (!prev) return null
+        const k = 1 - MOTION_EMA
+        const faded = { vx: prev.vx * k, vy: prev.vy * k, spread: prev.spread * k, counter: prev.counter * k }
+        return (this.motionEma[i] = Math.hypot(faded.vx, faded.vy) < 0.002 && faded.counter < 0.05 ? null : faded)
+      }
       const next = prev
         ? {
             vx: prev.vx + (m.vx - prev.vx) * MOTION_EMA,
@@ -195,7 +205,8 @@ export class CrowdEngine {
     })
     const turbulence = mo.map((m, i) => {
       if (!m || sm[i] < 3) return 0
-      const pressure = (sm[i] / (s.critical * af[i])) * (m.spread / REF_SPREAD) ** 2
+      const spread = Math.max(0, m.spread - (s.spreadNoise ?? 0))
+      const pressure = (sm[i] / (s.critical * af[i])) * (spread / REF_SPREAD) ** 2
       return Math.round(Math.min(100, pressure * 100))
     })
     const counterIdx = mo.map((m, i) => (m && sm[i] >= 3 ? Math.round(m.counter * 100) : 0))
@@ -216,7 +227,9 @@ export class CrowdEngine {
     levels.forEach((lvl, i) => {
       const z = name(i)
       const c = shown[i]
-      if (lvl > this.zoneAlertLevel[i] && lvl >= 1 && t - this.zoneLastAlertAt[i] >= ZONE_ALERT_COOLDOWN) {
+      const sinceLast = t - this.zoneLastAlertAt[i]
+      const repeat = lvl <= this.zoneLastLevel[i] && sinceLast < LEVEL_REPEAT_GAP
+      if (lvl > this.zoneAlertLevel[i] && lvl >= 1 && sinceLast >= ZONE_ALERT_COOLDOWN && !repeat) {
         const th = Math.round(thresholdFor(lvl, s) * af[i])
         const msg =
           lvl === 1
@@ -231,12 +244,15 @@ export class CrowdEngine {
           kind: 'level',
           title: `${LEVELS[lvl].label} threshold`,
           message: msg,
-          why: `Density rule: ${c} people in ${z} is at or above the ${LEVELS[lvl].label} threshold of ${th}. Counts are averaged over ${SMOOTH_WINDOW}s to ignore flicker.`,
+          why: `Density rule: ${c} people in ${z} is at or above the ${LEVELS[lvl].label} threshold of ${th}. Counts are averaged over ${smoothWindow}s to ignore flicker.`,
         })
         this.zoneAlertLevel[i] = lvl
         this.zoneLastAlertAt[i] = t
-      } else if (lvl < this.zoneAlertLevel[i] && sm[i] < thresholdFor(this.zoneAlertLevel[i], s) * af[i] * 0.85) {
-        this.zoneAlertLevel[i] = lvl
+        this.zoneLastLevel[i] = lvl
+      } else if (lvl < this.zoneAlertLevel[i]) {
+        // Re-arm only once the zone has clearly dropped: at least one whole person below the limit.
+        const limit = thresholdFor(this.zoneAlertLevel[i], s) * af[i]
+        if (sm[i] < limit - Math.max(1, limit * 0.15)) this.zoneAlertLevel[i] = lvl
       }
     })
 
@@ -400,7 +416,7 @@ export class CrowdEngine {
       surges,
       forecast,
       soonest: soonestIdx < 0 ? null : { name: name(soonestIdx), eta: forecast[soonestIdx] },
-      motion: mo.map((m) => (m ? { vx: m.vx, vy: m.vy } : null)),
+      motion: mo.map((m, i) => (m && shown[i] > 0 ? { vx: m.vx, vy: m.vy } : null)),
       turbulence,
       counterIdx,
       turbulent,

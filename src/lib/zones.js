@@ -102,9 +102,36 @@ export function aggregatePeople(people, zones) {
     const vx = g.reduce((a, p) => a + p.vx, 0) / n
     const vy = g.reduce((a, p) => a + p.vy, 0) / n
     const spread = Math.sqrt(g.reduce((a, p) => a + (p.vx - vx) ** 2 + (p.vy - vy) ** 2, 0) / n)
-    const meanSpeed = g.reduce((a, p) => a + Math.hypot(p.vx, p.vy), 0) / n
-    const counter = meanSpeed > 0.02 && n >= 3 ? Math.max(0, 1 - Math.hypot(vx, vy) / meanSpeed) : 0
-    return { vx, vy, spread, counter }
+    return { vx, vy, spread, counter: counterFlowIndex(g) }
   })
   return { counts, motion }
+}
+
+const MOVING = 0.06 // frame heights per second; slower than this counts as standing
+
+// Counter-flow = two streams moving opposite ways along one line, not random jostling.
+// Find the main axis of movement; if most movement lies along it, compare how many people
+// move each way. Equal streams give 1, a single stream gives 0.
+export function counterFlowIndex(people) {
+  const movers = people.filter((p) => Math.hypot(p.vx, p.vy) >= MOVING)
+  if (movers.length < 4) return 0
+  let sxx = 0
+  let syy = 0
+  let sxy = 0
+  for (const p of movers) {
+    sxx += p.vx * p.vx
+    syy += p.vy * p.vy
+    sxy += p.vx * p.vy
+  }
+  const theta = 0.5 * Math.atan2(2 * sxy, sxx - syy)
+  const ax = Math.cos(theta)
+  const ay = Math.sin(theta)
+  const along = movers.reduce((a, p) => a + (p.vx * ax + p.vy * ay) ** 2, 0)
+  const total = sxx + syy
+  if (!total || along / total < 0.7) return 0 // movement is not mostly along one line
+  let pos = 0
+  let neg = 0
+  for (const p of movers) (p.vx * ax + p.vy * ay > 0 ? pos++ : neg++)
+  if (pos < 2 || neg < 2) return 0
+  return (2 * Math.min(pos, neg)) / (pos + neg)
 }

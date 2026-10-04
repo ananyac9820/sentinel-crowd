@@ -168,7 +168,12 @@ export default function Dashboard({ onHome }) {
     },
     [engine],
   )
-  const live = useLiveDetection({ active: mode === 'live', onPeople: onLivePeople, onSwitchToSim: () => switchMode('sim') })
+  const onLiveSource = useCallback(() => {
+    engine.reset()
+    setSnap(emptySnapshot(zonesRef.current))
+    setSms([])
+  }, [engine])
+  const live = useLiveDetection({ active: mode === 'live', onPeople: onLivePeople, onSourceChange: onLiveSource, onSwitchToSim: () => switchMode('sim') })
 
   // ---- Alarm sound and simulated SMS for serious alerts ----
   const seenRef = useRef(0)
