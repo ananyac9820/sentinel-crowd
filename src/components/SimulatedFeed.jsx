@@ -1,10 +1,11 @@
 import { useEffect, useRef } from 'react'
-import { ROWS, COLS, ZONE_COUNT } from '../lib/risk.js'
+import { GRID_ROWS as ROWS, GRID_COLS as COLS, GRID_CELLS as ZONE_COUNT, GATES } from '../lib/zones.js'
 
 // Animated top-down view of a station platform. Each zone holds as many
 // "people" as the simulation says; they wander, arrive and leave toward the gates.
+// Their movement follows the scripted flow: a drift toward the stairs, opposing
+// streams where there is counter-flow, and jostling where the crowd is turbulent.
 
-const GATES = [0.15, 0.42, 0.85]
 const MARGIN = 0.02
 
 const zoneBounds = (i) => {
@@ -88,7 +89,7 @@ function drawBackground(ctx, W, H) {
   ctx.fillText('STAIRS', sx + sw / 2, sy - H * 0.012)
 }
 
-export default function SimulatedFeed({ countsRef, running }) {
+export default function SimulatedFeed({ countsRef, motionRef, running }) {
   const canvasRef = useRef(null)
   const runningRef = useRef(running)
   runningRef.current = running
@@ -134,7 +135,7 @@ export default function SimulatedFeed({ countsRef, running }) {
         const target = counts[i] ?? 0
         while (list.length < target) {
           const b = zoneBounds(i)
-          const a = { zone: i, x: rand(b.x0, b.x1), y: rand(b.y0, b.y1), alpha: 0, speed: rand(0.015, 0.035) }
+          const a = { zone: i, x: rand(b.x0, b.x1), y: rand(b.y0, b.y1), alpha: 0, speed: rand(0.015, 0.035), dir: Math.random() < 0.5 ? 1 : -1 }
           newTarget(a)
           list.push(a)
         }
@@ -170,11 +171,29 @@ export default function SimulatedFeed({ countsRef, running }) {
         a.x += (dx / d) * step
         a.y += (dy / d) * step
       }
+      // Scripted crowd motion for the agent's cell: drift, opposing stream, jostling.
+      const flow = (a) => {
+        const m = motionRef?.current?.[a.zone]
+        if (!moving || !m) return
+        const opposing = a.dir < 0 && m.counter > 0.3
+        const sign = opposing ? -1 : 1
+        a.x += m.vx * 2.5 * sign * dt * (H / W)
+        a.y += m.vy * 2.5 * sign * dt
+        const jolt = Math.max(0, m.spread - 0.012) * 1.6
+        a.x += (Math.random() - 0.5) * jolt * dt * 6
+        a.y += (Math.random() - 0.5) * jolt * dt * 6
+        const b = zoneBounds(a.zone)
+        // Keep people inside their zone; a stream that reaches the edge re-enters from the other side.
+        if (a.y > b.y1) a.y = b.y0 + 0.01
+        if (a.y < b.y0) a.y = b.y1 - 0.01
+        a.x = Math.min(b.x1, Math.max(b.x0, a.x))
+      }
 
       for (const list of zones)
         for (const a of list) {
           a.alpha = Math.min(1, a.alpha + dt * 1.5)
           move(a)
+          flow(a)
           draw(a)
         }
       for (let k = leaving.length - 1; k >= 0; k--) {
@@ -192,7 +211,7 @@ export default function SimulatedFeed({ countsRef, running }) {
       cancelAnimationFrame(raf)
       ro.disconnect()
     }
-  }, [countsRef])
+  }, [countsRef, motionRef])
 
   return <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
 }

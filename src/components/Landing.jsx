@@ -5,7 +5,8 @@ import StatusCard from './StatusCard.jsx'
 import AlertsFeed from './AlertsFeed.jsx'
 import SimulatedFeed from './SimulatedFeed.jsx'
 import ZoneGrid from './ZoneGrid.jsx'
-import { CrowdEngine, DEFAULT_SETTINGS, ZONE_COUNT } from '../lib/risk.js'
+import { CrowdEngine, DEFAULT_SETTINGS } from '../lib/risk.js'
+import { GRID_CELLS } from '../lib/zones.js'
 import { stepSimulation, SIM_DURATION } from '../lib/simulation.js'
 
 const STEPS = [
@@ -80,7 +81,8 @@ export default function Landing({ onOpen }) {
 const PREVIEW_START = 30 // skip the quiet first half-minute so visitors see the build-up sooner
 
 function LivePreview() {
-  const countsRef = useRef(Array(ZONE_COUNT).fill(0))
+  const countsRef = useRef(Array(GRID_CELLS).fill(0))
+  const motionRef = useRef(null)
   const [snap, setSnap] = useState(null)
 
   useEffect(() => {
@@ -99,7 +101,8 @@ function LivePreview() {
         return
       }
       const r = stepSimulation(engine, prev, t, wallStart + t * 1000)
-      countsRef.current = r.counts
+      countsRef.current = r.grid.counts
+      motionRef.current = r.grid.motion
       setSnap({ ...r.snap, alerts: r.snap.alerts.slice(0, 4) })
     }, 500)
     return () => clearInterval(id)
@@ -116,7 +119,7 @@ function LivePreview() {
           <StatusCard snap={snap} />
           <div className="grid gap-2 md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
             <div className="relative aspect-video overflow-hidden bg-[#f6f5f1]" style={{ borderRadius: 2 }}>
-              <SimulatedFeed countsRef={countsRef} running />
+              <SimulatedFeed countsRef={countsRef} motionRef={motionRef} running />
               <ZoneGrid snap={snap} />
             </div>
             <AlertsFeed alerts={snap.alerts} className="!min-h-0 max-md:h-48" />

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { UploadIcon, PlayIcon, PauseIcon, AlertIcon } from '../components/Icons.jsx'
 import { getDetector } from '../lib/detector.js'
-import { ROWS, COLS, ZONE_COUNT } from '../lib/risk.js'
 
 const DETECT_MS = 500
 const SLOW_LOAD_MS = 60000
@@ -55,14 +54,41 @@ function FeedSkeleton({ message, action }) {
   )
 }
 
-// Live Detection: COCO-SSD person detection on an uploaded video or webcam,
-// sampled every 500 ms, people counted into the 4x3 zone grid.
-export default function useLiveDetection({ active, onCounts, onSwitchToSim }) {
+// Simple tracking: match each person to the nearest person in the previous frame (greedy,
+// closest pairs first) and estimate their velocity in frame heights per second.
+const MAX_MATCH = 0.12 // frame heights a person can move between samples
+function trackVelocities(people, prev, now, aspect) {
+  if (!prev || !prev.people.length) return
+  const dt = now - prev.t
+  if (dt <= 0 || dt > 2) return
+  const pairs = []
+  people.forEach((p, i) =>
+    prev.people.forEach((q, j) => {
+      const d = Math.hypot((p.x - q.x) * aspect, p.y - q.y)
+      if (d <= MAX_MATCH) pairs.push({ i, j, d })
+    }),
+  )
+  pairs.sort((a, b) => a.d - b.d)
+  const usedI = new Set()
+  const usedJ = new Set()
+  for (const { i, j } of pairs) {
+    if (usedI.has(i) || usedJ.has(j)) continue
+    usedI.add(i)
+    usedJ.add(j)
+    people[i].vx = ((people[i].x - prev.people[j].x) * aspect) / dt
+    people[i].vy = (people[i].y - prev.people[j].y) / dt
+  }
+}
+
+// Live Detection: COCO-SSD person detection on an uploaded video or webcam, sampled every
+// 500 ms. Reports each person's position (0..1) and, when tracked, their velocity.
+export default function useLiveDetection({ active, onPeople, onSwitchToSim }) {
   const videoRef = useRef(null)
   const fileRef = useRef(null)
   const streamRef = useRef(null)
-  const onCountsRef = useRef(onCounts)
-  onCountsRef.current = onCounts
+  const prevRef = useRef(null)
+  const onPeopleRef = useRef(onPeople)
+  onPeopleRef.current = onPeople
 
   const [model, setModel] = useState(null)
   const [modelInfo, setModelInfo] = useState(null)
@@ -126,6 +152,7 @@ export default function useLiveDetection({ active, onCounts, onSwitchToSim }) {
   useEffect(() => {
     const v = videoRef.current
     setBoxes([])
+    prevRef.current = null
     setFeedError(null)
     setPaused(false)
     const src = sourcesRef.current.find((s) => s.id === sourceId)
@@ -182,19 +209,20 @@ export default function useLiveDetection({ active, onCounts, onSwitchToSim }) {
         if (stopped) return
         const W = v.videoWidth
         const H = v.videoHeight
-        const counts = Array(ZONE_COUNT).fill(0)
+        const now = performance.now() / 1000
         const bx = []
+        const people = []
         for (const p of preds) {
           if (p.class !== 'person') continue
           const [rawX, y, w, h] = p.bbox
           const x = mirrored ? W - rawX - w : rawX
-          const col = Math.min(COLS - 1, Math.max(0, Math.floor(((x + w / 2) / W) * COLS)))
-          const row = Math.min(ROWS.length - 1, Math.max(0, Math.floor(((y + h / 2) / H) * ROWS.length)))
-          counts[row * COLS + col]++
           bx.push({ x: x / W, y: y / H, w: w / W, h: h / H })
+          people.push({ x: (x + w / 2) / W, y: (y + h / 2) / H })
         }
+        trackVelocities(people, prevRef.current, now, W / H)
+        prevRef.current = { t: now, people }
         setBoxes(bx)
-        onCountsRef.current(counts)
+        onPeopleRef.current(people)
       } catch (e) {
         console.error(e)
       } finally {
