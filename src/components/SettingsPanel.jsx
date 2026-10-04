@@ -1,4 +1,3 @@
-import { CloseIcon } from './Icons.jsx'
 import { DEFAULT_SETTINGS, LEVELS } from '../lib/risk.js'
 
 const FIELDS = [
@@ -8,72 +7,62 @@ const FIELDS = [
   { key: 'surgePct', label: 'Surge: rise of', unit: 'percent' },
   { key: 'surgeMin', label: 'Surge: at least', unit: 'people' },
   { key: 'surgeWindow', label: 'Surge: within', unit: 'seconds' },
+  { key: 'turbulence', label: 'Turbulence alert at', unit: 'out of 100' },
+  { key: 'counterFlow', label: 'Counter-flow alert at', unit: 'out of 100' },
 ]
 
-export default function SettingsPanel({ mode, value, onChange, onClose }) {
-  const set = (k, v) => onChange({ ...value, [k]: Math.max(1, Number(v) || 1) })
+// Alert thresholds for the current mode (Simulation and Live keep separate values).
+export default function SettingsPanel({ mode, value, onChange, className = '' }) {
+  const set = (k, v) => onChange({ ...value, [k]: Math.max(1, Math.min(k === 'turbulence' || k === 'counterFlow' ? 100 : 999, Number(v) || 1)) })
   const invalid = !(value.watch < value.warning && value.warning < value.critical)
 
   return (
-    <div className="fixed inset-0 z-40 flex justify-end bg-[#11111166]" onClick={onClose}>
-      <aside
-        className="h-full w-full max-w-sm overflow-y-auto border-l border-line-strong bg-panel"
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-label="Alert thresholds"
-      >
-        <div className="panel-head">
-          <span className="label">Alert thresholds</span>
-          <button onClick={onClose} className="btn ml-auto h-7 w-7 justify-center px-0" aria-label="Close settings">
-            <CloseIcon size={12} />
-          </button>
+    <section className={`panel flex flex-col ${className}`}>
+      <div className="panel-head">
+        <span className="label">Alert thresholds</span>
+        <span className="text-[12px] text-muted">{mode === 'sim' ? 'Simulation' : 'Live detection'}</span>
+        <button onClick={() => onChange(DEFAULT_SETTINGS[mode])} className="btn ml-auto">
+          Reset
+        </button>
+      </div>
+      <div className="scroll-thin min-h-0 flex-1 overflow-y-auto px-3 pb-3">
+        <table className="mt-1 w-full text-[13px]">
+          <tbody className="divide-y divide-line">
+            {FIELDS.map((f) => (
+              <tr key={f.key}>
+                <td className="py-1.5 pr-2">
+                  <label htmlFor={`th-${f.key}`} style={{ color: f.color }} className={f.color ? 'num font-bold' : 'text-fg'}>
+                    {f.label}
+                  </label>
+                </td>
+                <td className="w-20 py-1.5">
+                  <input
+                    id={`th-${f.key}`}
+                    type="number"
+                    min={1}
+                    value={value[f.key]}
+                    onChange={(e) => set(f.key, e.target.value)}
+                    className="num w-full border border-line-strong bg-bg px-2 py-0.5 text-right text-fg"
+                    style={{ borderRadius: 2 }}
+                  />
+                </td>
+                <td className="py-1.5 pl-2 text-[12px] text-dim">{f.unit}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        {invalid && <p className="mt-2 text-[12px] text-warn">Thresholds should increase: WATCH, then WARNING, then CRITICAL.</p>}
+
+        <div className="mt-3 border-t border-line pt-2 text-[12px] leading-relaxed text-muted">
+          <p className="mb-1 font-bold text-fg">How risk is computed</p>
+          <p>Each zone gets a level from its density. A zone larger or smaller than a grid cell has its limits scaled to its size.</p>
+          <p>A surge fires when a zone's count rises by the percentage and minimum number of people above, within the time window.</p>
+          <p>The forecast fits a line to each flagged zone's count over the last 10 seconds and estimates when it will reach CRITICAL.</p>
+          <p>Turbulence is crowd pressure: density multiplied by how unevenly people move. Counter-flow measures movements cancelling each other out.</p>
+          <p>Overall risk is the worst zone's level, raised by one level while any zone has a surge, turbulence or counter-flow.</p>
         </div>
-        <div className="p-4">
-          <p className="text-[12px] text-muted">
-            Applies to <span className="text-fg">{mode === 'sim' ? 'Simulation' : 'Live Detection'}</span> mode. Changes apply on the next update.
-          </p>
-
-          <table className="mt-4 w-full text-[13px]">
-            <tbody className="divide-y divide-line">
-              {FIELDS.map((f) => (
-                <tr key={f.key}>
-                  <td className="py-2 pr-2">
-                    <label htmlFor={`th-${f.key}`} style={{ color: f.color }} className={f.color ? 'num font-medium' : 'text-fg'}>
-                      {f.label}
-                    </label>
-                  </td>
-                  <td className="w-20 py-2">
-                    <input
-                      id={`th-${f.key}`}
-                      type="number"
-                      min={1}
-                      value={value[f.key]}
-                      onChange={(e) => set(f.key, e.target.value)}
-                      className="num w-full border border-line-strong bg-bg px-2 py-1 text-right text-fg"
-                      style={{ borderRadius: 2 }}
-                    />
-                  </td>
-                  <td className="py-2 pl-2 text-[12px] text-dim">{f.unit}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          {invalid && <p className="mt-3 text-[12px] text-warn">Thresholds should increase: WATCH, then WARNING, then CRITICAL.</p>}
-
-          <div className="mt-5 border-t border-line pt-4 text-[12px] leading-relaxed text-muted">
-            <p className="mb-1 font-bold text-fg">How risk is computed</p>
-            <p>Each zone gets a level from its people count.</p>
-            <p>A surge fires when a zone's count rises by the percentage and minimum number of people above, within the time window.</p>
-            <p>Overall risk is the worst zone's level, raised by one level while any zone is surging.</p>
-            <p>The forecast fits a line to each flagged zone's count over the last 10 seconds and estimates when it will reach the CRITICAL threshold. A forecast alert fires when that is under 25 seconds away.</p>
-          </div>
-
-          <button onClick={() => onChange(DEFAULT_SETTINGS[mode])} className="btn mt-5">
-            Reset to defaults
-          </button>
-        </div>
-      </aside>
-    </div>
+      </div>
+    </section>
   )
 }

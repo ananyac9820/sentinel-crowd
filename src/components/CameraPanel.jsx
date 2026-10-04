@@ -2,11 +2,11 @@ import { useEffect, useState } from 'react'
 import SimulatedFeed from './SimulatedFeed.jsx'
 import ZoneGrid from './ZoneGrid.jsx'
 import { PlayIcon, PauseIcon, RestartIcon } from './Icons.jsx'
-import { SIM_DURATION, PHASES, phaseAt } from '../lib/simulation.js'
+import { SIM_DURATION, PHASES, AUTO_INTERVENTION_AT, INTERVENTIONS, phaseAt } from '../lib/simulation.js'
 
 const mmss = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`
 
-export default function CameraPanel({ mode, snap, countsRef, sim, live, className = '' }) {
+export default function CameraPanel({ mode, snap, countsRef, motionRef, sim, live, className = '' }) {
   const aspect = mode === 'live' && live?.aspect ? live.aspect : 16 / 9
   const showGrid = mode === 'sim' || live?.showGrid
 
@@ -23,19 +23,20 @@ export default function CameraPanel({ mode, snap, countsRef, sim, live, classNam
         <div className="ml-auto flex items-center gap-1.5">{mode === 'sim' ? <SimControls sim={sim} /> : live?.controls}</div>
       </div>
 
-      <div className="relative flex flex-1 items-center justify-center p-2 [container-type:size] max-lg:aspect-video lg:min-h-[220px]">
+      <div className="relative flex flex-1 items-center justify-center p-2 [container-type:size] max-lg:aspect-video lg:min-h-[200px]">
         <div
           className="relative overflow-hidden bg-[#f6f5f1]"
           style={{ aspectRatio: aspect, width: `min(100cqw, calc(100cqh * ${aspect}))`, borderRadius: 2 }}
         >
-          {mode === 'sim' ? <SimulatedFeed countsRef={countsRef} running={sim.playing} /> : live?.feed}
-          {showGrid && <ZoneGrid snap={snap} />}
+          {mode === 'sim' ? <SimulatedFeed countsRef={countsRef} motionRef={motionRef} running={sim.playing} /> : live?.feed}
+          {showGrid && <ZoneGrid snap={snap} aspect={aspect} />}
           {showGrid && <CctvOverlay label={mode === 'sim' ? 'CAM-03' : 'CAM-LIVE'} />}
           {mode === 'live' && live?.overlay}
         </div>
       </div>
 
       {mode === 'sim' && <SimTimeline sim={sim} />}
+      {mode === 'sim' && <WhatIfBar sim={sim} />}
     </section>
   )
 }
@@ -80,20 +81,50 @@ function SimTimeline({ sim }) {
   const t = Math.min(sim.t, SIM_DURATION)
   const done = sim.t >= SIM_DURATION
   return (
-    <div className="border-t border-line px-3 py-2">
+    <div className="border-t border-line px-3 py-1.5">
       <div className="flex items-center gap-3 text-[12px]">
         <span className="label shrink-0">Scenario</span>
-        <span className="truncate text-fg">{done ? 'Complete. Press Restart or R to replay.' : phaseAt(t).label}</span>
+        <span className="truncate text-fg">{done ? 'Complete. Press Restart or R to replay.' : phaseAt(t, sim.plan).label}</span>
         <span className="num ml-auto text-muted">
           {mmss(t)} / {mmss(SIM_DURATION)}
         </span>
       </div>
-      <div className="relative mt-1.5 h-1 bg-raised">
+      <div className="relative mt-1 h-1 bg-raised">
         <div className="absolute inset-y-0 left-0 bg-accent" style={{ width: `${(t / SIM_DURATION) * 100}%` }} />
         {PHASES.slice(1).map((p) => (
           <span key={p.t} className="absolute -top-0.5 h-2 w-px bg-line-strong" style={{ left: `${(p.t / SIM_DURATION) * 100}%` }} title={p.label} />
         ))}
+        {sim.plan.map((iv) => (
+          <span
+            key={iv.type}
+            className="absolute -top-1 h-3 w-0.5 bg-crit"
+            style={{ left: `${(Math.min(iv.at, SIM_DURATION) / SIM_DURATION) * 100}%` }}
+            title={`${INTERVENTIONS[iv.type].short} at ${mmss(iv.at)}`}
+          />
+        ))}
       </div>
+    </div>
+  )
+}
+
+// "What if" buttons: apply an action now and watch the crowd respond.
+function WhatIfBar({ sim }) {
+  const applied = (type) => sim.plan.find((iv) => iv.type === type && sim.t >= iv.at)
+  return (
+    <div className="flex flex-wrap items-center gap-2 border-t border-line px-3 py-1.5">
+      <span className="label shrink-0">What if</span>
+      {Object.entries(INTERVENTIONS).map(([type, def]) => {
+        const done = applied(type)
+        return (
+          <button key={type} className={`btn ${done ? '' : 'btn-primary'}`} disabled={!!done} onClick={() => sim.onIntervene(type)} title={def.message}>
+            {done ? `${def.short} at ${mmss(done.at)}` : def.label}
+          </button>
+        )
+      })}
+      <label className="ml-auto flex items-center gap-1.5 text-[12px] text-muted" title={`Opens gate 2 automatically at ${mmss(AUTO_INTERVENTION_AT)} unless you act first`}>
+        <input type="checkbox" checked={sim.auto} onChange={(e) => sim.onAuto(e.target.checked)} className="accent-[#111111]" />
+        Auto response at {mmss(AUTO_INTERVENTION_AT)}
+      </label>
     </div>
   )
 }
