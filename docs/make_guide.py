@@ -258,8 +258,9 @@ st += [
         ["Timeline tab", "Full chart with turbulence, early-warning lead time and run summary, alert history with filters, incident report, CSV exports, and SMS log."],
         ["Setup tab", "Alert thresholds, notification settings (alarm sound, simulated SMS), and the zone editor."],
         ["Shortcuts", "Space pause or play, R restart, F fullscreen, 1 to 5 switch tabs. Sound on or off is in the top bar."],
+        ["On a phone", "The same dashboard stacks into one column: status, camera, what-if buttons, chart and alerts. Tabs scroll sideways under the top bar."],
     ], [30 * mm, W - 30 * mm]),
-    PageBreak(),
+    Spacer(1, 8),
     P("5.3 Monitor tab at each risk level", "h2"),
     shot("safe.png", "SAFE: normal evening flow. Arrows show everyone drifting toward the staircase."),
     shot("warning.png", "WARNING at 0:42: B3 next to the staircase is filling fast. The status bar shows \"Critical in B3 ~15s\" and the forecast alert has fired."),
@@ -336,9 +337,13 @@ st += [
         "When it says \"AI model ready\", click <b>Upload MP4</b> or <b>Use webcam</b>. Choosing a new camera starts a fresh analysis.",
         "Twice per second, every person is boxed, tracked for movement, counted into a zone, and the same rules run on the real data.",
     ]),
-    P("Tips: high-angle CCTV-style clips work best. Sample clips are in the <font name=\"Mono\">demo-videos</font> folder on the laptop "
-      "(the Indian platform and rush-hour clips work well; the stairs clip is a close-up and is not useful). The webcam view is mirrored like a video call. "
-      "Webcams only work on https or localhost. To connect a real CCTV camera today, use OBS Studio's Virtual Camera or a phone webcam app such as DroidCam."),
+    P("Sample clips are in the <font name=\"Mono\">demo-videos</font> folder on the laptop, with a README describing each one. "
+      "Best for the demo: <b>overhead-crowd-mixed-flow</b> (about 20 people, clear flow arrows), <b>indian-station-high-angle</b> (Indian platform from above), "
+      "<b>station-stairs-up-and-down</b> (try for counter-flow) and <b>crowded-indian-railway-platform</b> (good for explaining undercounting). "
+      "The straight top-down clip <b>overhead-crossing-crowd</b> finds nobody: a useful example of why some camera angles need a crowd-density model."),
+    P("Cameras: on a laptop, <b>Use webcam</b> (mirrored like a video call). On a phone or tablet, Live mode offers <b>Back camera</b> and <b>Front camera</b>, "
+      "and a <b>Switch</b> button while a camera is on. Only the front camera is mirrored. Cameras only work on https or localhost, so on a phone use the deployed link. "
+      "To connect a real CCTV camera today, use OBS Studio's Virtual Camera so it appears as a webcam."),
 ]
 
 # ---------------- 7. Rules ----------------
@@ -348,12 +353,12 @@ st += [
     P("All rules are deliberately simple so they can be explained to anyone in one sentence. Defaults are shown for Simulation / Live."),
     table([
         ["Rule", "What it checks", "Default (Simulation / Live)"],
-        ["Density levels", "People in a zone compared with three limits. Limits are for a standard grid cell and scale with zone size, so this is really density.", "WATCH 8 / 3, WARNING 13 / 5, CRITICAL 18 / 8 people"],
-        ["Surge", "Count rose by at least a percentage AND at least a number of people within a time window, and is still rising.", "+35% and +4 people in 20 s / +50% and +2 people in 20 s"],
+        ["Density levels", "People in a zone compared with three limits. Limits are for a standard grid cell and scale with zone size, so this is really density.", "WATCH 8 / 4, WARNING 13 / 6, CRITICAL 18 / 10 people"],
+        ["Surge", "Count rose by at least a percentage AND at least a number of people within a time window, and is still rising. Percentages are measured from at least 3 people, so a nearly empty zone does not report a 400% surge.", "+35% and +4 people in 20 s / +50% and +2 people in 20 s"],
         ["Forecast", "Straight line fitted to the zone's count over the last 10 s, projected to the CRITICAL limit. Only for zones at WATCH or above that are still rising.", "Shown if under 60 s; alert if under 25 s"],
         ["Turbulence", "Crowd pressure = (people / CRITICAL limit) x (movement spread / reference spread) squared, shown on a 0 to 100 scale. Movement spread is how differently people in the zone are moving.", "Alert at 60 or more, held for 1.5 s, zone at WATCH or above"],
         ["Counter-flow", "Find the main line of movement; if people move both ways along it, the index rises toward 100 (equal streams). Random jostling scores 0.", "Alert at 55 or more, held for 1.5 s, zone at WATCH or above"],
-        ["Overall risk", "Worst zone's level, raised one level while any zone has a surge, turbulence or counter-flow.", "Same in both modes"],
+        ["Overall risk", "Worst zone's level, raised one level while any zone has a surge, turbulence or counter-flow.", "Live: a site-wide CRITICAL must last 3 s before it is declared"],
         ["Risk score", "0 to 100. 75 means a zone is at its CRITICAL limit. +10 while a surge, turbulence or counter-flow is active.", "Same in both modes"],
         ["Lead time", "Seconds between a zone's first early warning (surge, forecast, turbulence, counter-flow) and the moment it reached CRITICAL.", "Shown in the Timeline tab and report"],
     ], [30 * mm, 92 * mm, W - 122 * mm]),
@@ -364,13 +369,13 @@ st += [
         "A zone must drop at least one whole person below a limit before the same alert can fire again, and the same level never repeats within 30 s.",
         "Surge, forecast, turbulence and counter-flow alerts have a 30 s cooldown per zone. A zone that is emptying out is never called a surge.",
         "In Live mode, people only report movement after being tracked in three consecutive frames, and small movement jitter (0.02 frame heights per second) is ignored.",
-        "The overall level must stay lower for 3 s before it is lowered, so it does not flicker.",
+        "The overall level must stay lower for 3 s before it is lowered, so it does not flicker. In Live mode a site-wide CRITICAL must also last 3 s before it is raised.",
     ]),
 ]
 
 # ---------------- 8. Tech ----------------
 st += [
-    PageBreak(),
+    Spacer(1, 10),
     P("8. Technology used", "h1"),
     table([
         ["Tool", "What we used it for", "Why we chose it"],
@@ -437,7 +442,7 @@ st += [
 
 # ---------------- 14. Demo script ----------------
 st += [
-    PageBreak(),
+    Spacer(1, 10),
     P("14. Demo script (about 90 seconds)", "h1"),
     P("Press R first so the scenario starts from SAFE. Use 1x speed. Keep Sound on so judges hear the alarm.", "small"),
     Spacer(1, 4),
