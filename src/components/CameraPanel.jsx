@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react'
 import SimulatedFeed from './SimulatedFeed.jsx'
 import ZoneGrid from './ZoneGrid.jsx'
+import { SitePins } from './SitePanel.jsx'
+import { SITE_TYPES, isConfigured } from '../lib/site.js'
 import { PlayIcon, PauseIcon, RestartIcon } from './Icons.jsx'
 import { SIM_DURATION, PHASES, AUTO_INTERVENTION_AT, INTERVENTIONS, phaseAt } from '../lib/simulation.js'
 
 const mmss = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`
 
-export default function CameraPanel({ mode, snap, countsRef, motionRef, sim, live, className = '' }) {
+export default function CameraPanel({ mode, snap, countsRef, motionRef, sim, live, site, className = '' }) {
+  const configured = isConfigured(site)
   const aspect = mode === 'live' && live?.aspect ? live.aspect : 16 / 9
   const showGrid = mode === 'sim' || live?.showGrid
 
@@ -30,11 +33,22 @@ export default function CameraPanel({ mode, snap, countsRef, motionRef, sim, liv
         >
           {mode === 'sim' ? <SimulatedFeed countsRef={countsRef} motionRef={motionRef} running={sim.playing} /> : live?.feed}
           {showGrid && <ZoneGrid snap={snap} aspect={aspect} />}
+          {showGrid && <SitePins site={site} />}
           {showGrid && <CctvOverlay label={mode === 'sim' ? 'CAM-03' : 'CAM-LIVE'} />}
           {mode === 'live' && live?.overlay}
         </div>
       </div>
 
+      <div className="flex flex-wrap items-center gap-x-2 border-t border-line px-3 py-1 text-[12px]">
+        <span className="label shrink-0">Site</span>
+        {configured ? (
+          <span className="min-w-0 truncate">
+            <b>{SITE_TYPES[site.type].label}:</b> {site.name}. Actions use its configured exits and entries.
+          </span>
+        ) : (
+          <span className="min-w-0 text-warn">Not configured. Advice is generic and names no gates. Set it up on the Setup tab.</span>
+        )}
+      </div>
       {mode === 'sim' && <SimTimeline sim={sim} />}
       {mode === 'sim' && <WhatIfBar sim={sim} />}
     </section>

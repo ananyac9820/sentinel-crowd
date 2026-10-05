@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import SimulatedFeed from './SimulatedFeed.jsx'
 import { CloseIcon } from './Icons.jsx'
-import { DEFAULT_ZONES, finalise, isDefaultGrid, nearestGate } from '../lib/zones.js'
+import { DEFAULT_ZONES, finalise, isDefaultGrid } from '../lib/zones.js'
 
 // Named zones for Platform 2, matching the simulated camera view.
 const STATION_PRESET = [
@@ -15,7 +15,7 @@ const STATION_PRESET = [
 const clamp01 = (v) => Math.min(1, Math.max(0, v))
 let nextId = 1
 const newId = () => `Z${Date.now().toString(36)}${nextId++}`
-const plain = (zs) => zs.map(({ id, name, x, y, w, h, gate, custom }) => ({ id, name, x, y, w, h, gate, custom }))
+const plain = (zs) => zs.map(({ id, name, x, y, w, h, custom }) => ({ id, name, x, y, w, h, custom }))
 
 // Draw your own zones on the camera view. Changes only take effect when applied.
 export default function ZoneEditor({ zones, onApply, mode, countsRef, motionRef, className = '' }) {
@@ -58,14 +58,14 @@ export default function ZoneEditor({ zones, onApply, mode, countsRef, motionRef,
       setSelected(hit?.id ?? null)
       return
     }
-    const z = { id: newId(), name: `Zone ${draft.length + 1}`, x, y, w, h, gate: nearestGate(x + w / 2), custom: true }
+    const z = { id: newId(), name: `Zone ${draft.length + 1}`, x, y, w, h, custom: true }
     setDraft([...draft, z])
     setSelected(z.id)
   }
 
   const update = (id, patch) => setDraft(draft.map((z) => (z.id === id ? { ...z, ...patch, custom: true } : z)))
   const remove = (id) => setDraft(draft.filter((z) => z.id !== id))
-  const usePreset = () => setDraft(STATION_PRESET.map((z) => ({ ...z, id: newId(), gate: nearestGate(z.x + z.w / 2), custom: true })))
+  const usePreset = () => setDraft(STATION_PRESET.map((z) => ({ ...z, id: newId(), custom: true })))
 
   return (
     <section className={`panel flex flex-col ${className}`}>
@@ -138,19 +138,6 @@ export default function ZoneEditor({ zones, onApply, mode, countsRef, motionRef,
                   style={{ borderRadius: 2 }}
                   aria-label="Zone name"
                 />
-                <select
-                  value={z.gate}
-                  onChange={(e) => update(z.id, { gate: Number(e.target.value) })}
-                  className="border border-line bg-bg px-1 py-0.5 text-[12px]"
-                  style={{ borderRadius: 2 }}
-                  aria-label="Exit gate"
-                >
-                  {[1, 2, 3].map((g) => (
-                    <option key={g} value={g}>
-                      Gate {g}
-                    </option>
-                  ))}
-                </select>
                 <button className="btn h-6 w-6 justify-center px-0" onClick={() => remove(z.id)} aria-label={`Delete ${z.name}`}>
                   <CloseIcon size={12} />
                 </button>
@@ -166,7 +153,7 @@ export default function ZoneEditor({ zones, onApply, mode, countsRef, motionRef,
               Discard
             </button>
           </div>
-          <p className="mt-1.5 text-[11px] leading-snug text-dim">Applying restarts monitoring. Limits are scaled to each zone's size, so a big zone needs more people to be flagged.</p>
+          <p className="mt-1.5 text-[11px] leading-snug text-dim">Applying restarts monitoring. Limits are scaled to each zone's size. Exits and entries are set in the Site panel above.</p>
         </div>
       </div>
     </section>

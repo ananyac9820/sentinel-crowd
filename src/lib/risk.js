@@ -8,6 +8,7 @@
 // Overall risk = worst zone level, raised one level while any zone has a surge, turbulence or counter-flow.
 
 import { DEFAULT_ZONES, GRID_CELLS } from './zones.js'
+import { PROFILES, advise, adviceSource, zoneLinks } from './site.js'
 
 export const LEVELS = [
   { key: 'SAFE', label: 'SAFE', color: '#2f7a45' },
@@ -53,9 +54,10 @@ const MOTION_EMA = 0.35
 const REF_SPREAD = 0.05 // movement spread (frame heights per second) treated as fully chaotic
 
 export class CrowdEngine {
-  constructor(settings, zones = DEFAULT_ZONES) {
+  constructor(settings, zones = DEFAULT_ZONES, site = PROFILES.generic) {
     this.settings = settings
     this.zones = zones
+    this.site = site // where exits and entries are; advice comes from here, not from the video
     this.reset()
   }
 
@@ -223,6 +225,9 @@ export class CrowdEngine {
     const turbulent = turbulence.map((v, i) => held(this.turbSince, v >= s.turbulence && levels[i] >= 1, i))
     const counterFlow = counterIdx.map((v, i) => held(this.counterSince, v >= s.counterFlow && levels[i] >= 1, i))
 
+    const site = this.site
+    const ctx = (i) => ({ z: name(i), c: shown[i], calm: name(calmestNeighbour(i)), links: zoneLinks(Z[i], site) })
+    const src = adviceSource(site)
     const calmestNeighbour = (i) => {
       const nb = Z[i].neighbours?.length ? Z[i].neighbours : [...Array(n).keys()].filter((j) => j !== i)
       return nb.reduce((best, j) => (shown[j] < shown[best] ? j : best), nb[0])
@@ -236,12 +241,7 @@ export class CrowdEngine {
       const repeat = lvl <= this.zoneLastLevel[i] && sinceLast < LEVEL_REPEAT_GAP
       if (lvl > this.zoneAlertLevel[i] && lvl >= 1 && sinceLast >= ZONE_ALERT_COOLDOWN && !repeat) {
         const th = Math.round(thresholdFor(lvl, s) * af[i])
-        const msg =
-          lvl === 1
-            ? `Zone ${z} getting busy: ${c} people. Keep a steward watching this area.`
-            : lvl === 2
-              ? `Zone ${z} congested: ${c} people. Pause entry and divert flow towards ${name(calmestNeighbour(i))}.`
-              : `Zone ${z} at crush-risk density: ${c} people. Open exit gate ${Z[i].gate} and halt platform entry now.`
+        const msg = advise(site, ['', 'watch', 'warning', 'critical'][lvl], ctx(i))
         this.pushAlert({
           time: wall,
           zone: z,
@@ -249,7 +249,7 @@ export class CrowdEngine {
           kind: 'level',
           title: `${LEVELS[lvl].label} threshold`,
           message: msg,
-          why: `Density rule: ${c} people in ${z} is at or above the ${LEVELS[lvl].label} threshold of ${th}. Counts are averaged over ${smoothWindow}s to ignore flicker.`,
+          why: `Density rule: ${c} people in ${z} is at or above the ${LEVELS[lvl].label} threshold of ${th}. Counts are averaged over ${smoothWindow}s to ignore flicker.${lvl >= 2 ? src : ''}`,
         })
         this.zoneAlertLevel[i] = lvl
         this.zoneLastAlertAt[i] = t
@@ -273,8 +273,8 @@ export class CrowdEngine {
         severity: Math.min(3, Math.max(1, levels[i] + 1)),
         kind: 'surge',
         title: 'Rapid build-up',
-        message: `Zone ${z} density rising fast: up ${pct}% in ${s.surgeWindow}s. Consider opening exit gate ${Z[i].gate}.`,
-        why: `Surge rule: ${z} went from ${from} to ${to} people (+${pct}%) in ${s.surgeWindow}s, above the trigger of +${s.surgePct}% and at least +${s.surgeMin} people. A surge raises overall risk by one level.`,
+        message: `Zone ${z} density rising fast: up ${pct}% in ${s.surgeWindow}s. ${advise(site, 'surge', ctx(i))}`,
+        why: `Surge rule: ${z} went from ${from} to ${to} people (+${pct}%) in ${s.surgeWindow}s, above the trigger of +${s.surgePct}% and at least +${s.surgeMin} people. A surge raises overall risk by one level.${src}`,
       })
       this.surgeLastAt[i] = t
     })
@@ -291,8 +291,8 @@ export class CrowdEngine {
         severity: Math.min(3, levels[i] + 1),
         kind: 'forecast',
         title: 'Forecast',
-        message: `Zone ${z} on course to reach crush density in about ${eta}s. Prepare to open exit gate ${Z[i].gate} and slow entry now.`,
-        why: `Forecast rule: ${z} grew from ${from} to ${shown[i]} people over the last ${FORECAST_WINDOW}s (about +${rates[i].toFixed(1)} people per second). At that rate it crosses the CRITICAL threshold of ${Math.round(s.critical * af[i])} in about ${eta}s. Forecast alerts fire when the projection is under ${FORECAST_ALERT_AT}s.`,
+        message: `Zone ${z} on course to reach crush density in about ${eta}s. ${advise(site, 'forecast', ctx(i))}`,
+        why: `Forecast rule: ${z} grew from ${from} to ${shown[i]} people over the last ${FORECAST_WINDOW}s (about +${rates[i].toFixed(1)} people per second). At that rate it crosses the CRITICAL threshold of ${Math.round(s.critical * af[i])} in about ${eta}s. Forecast alerts fire when the projection is under ${FORECAST_ALERT_AT}s.${src}`,
       })
       this.forecastLastAt[i] = t
     })
@@ -309,8 +309,8 @@ export class CrowdEngine {
         severity: Math.min(3, Math.max(2, levels[i] + 1)),
         kind: 'turbulence',
         title: 'Crowd turbulence',
-        message: `Zone ${z} crowd turbulence ${turbulence[i]}/100: people are being pushed in different directions. This often comes just before a crush. Stop entry and open exit gate ${Z[i].gate}.`,
-        why: `Turbulence rule: crowd pressure is density multiplied by how unevenly people are moving (Helbing et al., 2007). ${z} is at ${pctOfCritical}% of the CRITICAL count and its movement spread is ${mo[i].spread.toFixed(3)} frame heights per second, giving ${turbulence[i]}/100, above the trigger of ${s.turbulence}.`,
+        message: `Zone ${z} crowd turbulence ${turbulence[i]}/100: people are being pushed in different directions. This often comes just before a crush. ${advise(site, 'turbulence', ctx(i))}`,
+        why: `Turbulence rule: crowd pressure is density multiplied by how unevenly people are moving (Helbing et al., 2007). ${z} is at ${pctOfCritical}% of the CRITICAL count and its movement spread is ${mo[i].spread.toFixed(3)} frame heights per second, giving ${turbulence[i]}/100, above the trigger of ${s.turbulence}.${src}`,
       })
       this.turbLastAt[i] = t
     })
@@ -376,8 +376,8 @@ export class CrowdEngine {
           severity: 3,
           kind: 'site',
           title: 'Site-wide CRITICAL',
-          message: `Crush risk building around ${name(top)}. Activate crowd-control protocol: open gate ${Z[top].gate}, stop announcements drawing people to the platform, dispatch officers.`,
-          why: `Overall rule: worst zone is ${LEVELS[worst].label} (${name(worstIdx)})${bump ? `, and ${bumpReason} raises it by one level` : ''}, giving CRITICAL${s.criticalHold ? ` for at least ${s.criticalHold}s` : ''}.`,
+          message: advise(site, 'site', ctx(top)),
+          why: `Overall rule: worst zone is ${LEVELS[worst].label} (${name(worstIdx)})${bump ? `, and ${bumpReason} raises it by one level` : ''}, giving CRITICAL${s.criticalHold ? ` for at least ${s.criticalHold}s` : ''}.${src}`,
         })
       }
     } else if (target < this.overall) {
@@ -394,7 +394,7 @@ export class CrowdEngine {
           title: target === 0 ? 'All clear' : 'Risk easing',
           message:
             target === 0
-              ? 'All zones back to safe density. Keep gates open until the platform fully clears.'
+              ? 'All zones back to safe density. Keep exit routes open until the area fully clears.'
               : `Overall risk eased from ${LEVELS[prev].label} to ${LEVELS[target].label}. Keep monitoring ${name(worstIdx)}.`,
           why: `Overall rule: worst zone is now ${LEVELS[worst].label}${bump ? ` with ${bumpReason} active` : ' and no surge, turbulence or counter-flow is active'}. Downgrades wait ${DOWNGRADE_HOLD}s to avoid flip-flopping.`,
         })
