@@ -9,6 +9,7 @@ import ZoneTable from './ZoneTable.jsx'
 import ZoneGrid from './ZoneGrid.jsx'
 import SettingsPanel from './SettingsPanel.jsx'
 import ZoneEditor from './ZoneEditor.jsx'
+import SitePanel from './SitePanel.jsx'
 import StationMap from './StationMap.jsx'
 import TimelineView from './TimelineView.jsx'
 import useLiveDetection from '../hooks/useLiveDetection.jsx'
@@ -16,6 +17,7 @@ import { CrowdEngine, DEFAULT_SETTINGS, emptySnapshot } from '../lib/risk.js'
 import { DEFAULT_ZONES, GRID_CELLS, aggregateGrid, aggregatePeople, finalise } from '../lib/zones.js'
 import { AUTO_INTERVENTION_AT, STATION_CAMERAS, simGrid, sideGrid, stepSimulation } from '../lib/simulation.js'
 import { playAlarm, unlockAudio } from '../lib/alarm.js'
+import { cloneProfile } from '../lib/site.js'
 import { alertsCsv, download, openReport, timelineCsv } from '../lib/report.js'
 
 const TICK_MS = 500
@@ -54,6 +56,8 @@ export default function Dashboard({ onHome }) {
   const [mode, setMode] = useState('sim') // Simulation is the default so the demo never fails on stage.
   const [settings, setSettings] = useState(DEFAULT_SETTINGS)
   const [zones, setZones] = useState(loadZones)
+  // Simulation uses the configured railway platform; Live starts unconfigured (generic advice).
+  const [sites, setSites] = useState(() => load('sentinel.site.v1', { sim: cloneProfile('station'), live: cloneProfile('generic') }))
   const [snap, setSnap] = useState(() => emptySnapshot(zones))
   const [sideSnaps, setSideSnaps] = useState({})
   const [notify, setNotify] = useState(() => load('sentinel.notify.v1', { sound: true, sms: true, to: 'Station Master, Central Junction' }))
@@ -61,7 +65,7 @@ export default function Dashboard({ onHome }) {
   const [toast, setToast] = useState(null)
 
   const engineRef = useRef(null)
-  if (!engineRef.current) engineRef.current = new CrowdEngine(settings.sim, zones)
+  if (!engineRef.current) engineRef.current = new CrowdEngine(settings.sim, zones, sites.sim)
   const engine = engineRef.current
   const sideRef = useRef(null)
   if (!sideRef.current)
@@ -78,7 +82,8 @@ export default function Dashboard({ onHome }) {
 
   useEffect(() => {
     engine.settings = settings[mode]
-  }, [engine, settings, mode])
+    engine.site = sites[mode]
+  }, [engine, settings, sites, mode])
 
   // ---- Simulation clock and interventions ----
   const [simT, setSimT] = useState(0)
@@ -145,6 +150,7 @@ export default function Dashboard({ onHome }) {
     if (m === mode) return
     engine.reset()
     engine.settings = settings[m]
+    engine.site = sites[m]
     setSnap(emptySnapshot(zones))
     setSms([])
     setMode(m)
@@ -158,6 +164,19 @@ export default function Dashboard({ onHome }) {
     engine.setZones(z)
     if (mode === 'sim') restartSim()
     else setSnap(emptySnapshot(z))
+  }
+
+  const applySite = (v) => {
+    const next = { ...sites, [mode]: v }
+    setSites(next)
+    save('sentinel.site.v1', next)
+    engine.site = v
+    if (mode === 'sim') restartSim()
+    else {
+      engine.reset() // a new site starts a fresh analysis
+      setSnap(emptySnapshot(zonesRef.current))
+      setSms([])
+    }
   }
 
   // ---- Live detection ----
@@ -245,8 +264,8 @@ export default function Dashboard({ onHome }) {
   const exportName = `sentinel-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')}`
   const report = () =>
     openReport({
-      site: 'Central Junction',
-      camera: mode === 'sim' ? 'CAM-03 Platform 2' : live.title || 'Live camera',
+      site: sites[mode].type === 'generic' ? 'Site not configured' : sites[mode].name,
+      camera: mode === 'sim' ? 'CAM-03' : live.title || 'Live camera',
       modeLabel: mode === 'sim' ? 'Simulation scenario' : 'Live detection',
       snap,
       plan: mode === 'sim' ? plan.filter((iv) => simT >= iv.at) : [],
@@ -325,6 +344,7 @@ export default function Dashboard({ onHome }) {
                 onAuto: setAuto,
               }}
               live={live}
+              site={sites[mode]}
             />
             <DensityChart compact className="h-[118px] shrink-0" timeline={snap.timeline} now={snap.t} />
           </div>
@@ -346,10 +366,10 @@ export default function Dashboard({ onHome }) {
                 </div>
               </div>
               <p className="border-t border-line px-3 py-2 text-[12px] leading-snug text-muted">
-                Change the zones on the <button className="link" onClick={() => setTab('setup')}>Setup</button> tab. Each zone suggests its nearest exit gate in alerts.
+                Change zones, exits and entries on the <button className="link" onClick={() => setTab('setup')}>Setup</button> tab. Alerts name the nearest configured exit; with no site configured they name none.
               </p>
             </section>
-            <ZoneTable snap={snap} settings={settings[mode]} className="lg:min-h-0" />
+            <ZoneTable snap={snap} settings={settings[mode]} site={sites[mode]} className="lg:min-h-0" />
           </div>
         )}
 
@@ -369,7 +389,10 @@ export default function Dashboard({ onHome }) {
               <SettingsPanel mode={mode} value={settings[mode]} onChange={(v) => setSettings((s) => ({ ...s, [mode]: v }))} className="lg:min-h-0 lg:flex-1" />
               <NotifyPanel notify={notify} onChange={setNotify} />
             </div>
-            <ZoneEditor zones={zones} onApply={applyZones} mode={mode} countsRef={countsRef} motionRef={motionRef} className="lg:min-h-0" />
+            <div className="flex flex-col gap-3 lg:min-h-0 lg:overflow-y-auto">
+              <SitePanel site={sites[mode]} onApply={applySite} mode={mode} zones={zones} countsRef={countsRef} motionRef={motionRef} />
+              <ZoneEditor zones={zones} onApply={applyZones} mode={mode} countsRef={countsRef} motionRef={motionRef} />
+            </div>
           </div>
         )}
       </main>

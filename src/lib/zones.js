@@ -5,10 +5,8 @@ export const GRID_ROWS = ['A', 'B', 'C']
 export const GRID_COLS = 4
 export const GRID_CELLS = GRID_ROWS.length * GRID_COLS
 
-// Exit gates along the bottom edge of the platform (x positions), shared with the simulated feed.
+// Gate positions drawn on the simulated platform picture. Real exits come from the site configuration (site.js).
 export const GATES = [0.15, 0.42, 0.85]
-
-export const nearestGate = (x) => GATES.reduce((best, gx, i) => (Math.abs(gx - x) < Math.abs(GATES[best] - x) ? i : best), 0) + 1
 
 export function gridZones() {
   const zones = []
@@ -21,9 +19,9 @@ export function gridZones() {
 
 export const DEFAULT_ZONES = gridZones()
 
-// Adds derived fields: gate, neighbours, grid overlap weights.
+// Adds derived fields: neighbours, grid overlap weights.
 export function finalise(zones) {
-  const out = zones.map((z) => ({ ...z, gate: z.gate ?? nearestGate(z.x + z.w / 2) }))
+  const out = zones.map((z) => ({ ...z }))
   out.forEach((z, i) => {
     const touching = []
     out.forEach((o, j) => {

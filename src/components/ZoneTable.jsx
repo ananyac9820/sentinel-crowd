@@ -1,4 +1,5 @@
 import { LEVELS } from '../lib/risk.js'
+import { isConfigured, zoneLinks } from '../lib/site.js'
 
 const TREND = {
   1: { sym: '↑', label: 'rising', cls: 'text-fg' },
@@ -29,7 +30,8 @@ function Bar({ value, threshold }) {
 }
 
 // Detailed table of every zone: density, forecast and movement.
-export default function ZoneTable({ snap, settings, className = '' }) {
+export default function ZoneTable({ snap, settings, site, className = '' }) {
+  const configured = isConfigured(site)
   return (
     <section className={`panel flex flex-col ${className}`}>
       <div className="panel-head">
@@ -40,7 +42,7 @@ export default function ZoneTable({ snap, settings, className = '' }) {
         <table className="w-full text-[13px]">
           <thead className="sticky top-0 bg-panel">
             <tr className="label border-b border-line-strong text-left">
-              {['Zone', 'People', 'Level', 'Trend', 'Critical in', 'Turbulence', 'Counter-flow', 'Moving', 'Exit'].map((h) => (
+              {['Zone', 'People', 'Level', 'Trend', 'Critical in', 'Turbulence', 'Counter-flow', 'Moving', 'Nearest exit'].map((h) => (
                 <th key={h} className="px-3 py-1.5 font-bold">
                   {h}
                 </th>
@@ -76,7 +78,7 @@ export default function ZoneTable({ snap, settings, className = '' }) {
                   <td className="num px-3 py-1.5 text-[15px]" title={dir.label}>
                     {snap.counterFlow?.[i] ? <span className="text-[12px] font-bold text-crit">BOTH WAYS</span> : dir.sym}
                   </td>
-                  <td className="num px-3 py-1.5">Gate {z.gate}</td>
+                  <td className="px-3 py-1.5 text-[12px]">{configured ? zoneLinks(z, site).exit ?? '-' : <span className="text-dim">Not configured</span>}</td>
                 </tr>
               )
             })}
