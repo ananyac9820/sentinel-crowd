@@ -19,10 +19,11 @@ export const INFO_COLOR = '#111111'
 
 export const DEFAULT_SETTINGS = {
   // Simulation numbers are people per zone on a station platform.
-  sim: { watch: 8, warning: 13, critical: 18, surgePct: 35, surgeWindow: 20, surgeMin: 4, turbulence: 60, counterFlow: 55, smoothing: 1.5, spreadNoise: 0 },
+  sim: { watch: 8, warning: 13, critical: 18, surgePct: 35, surgeWindow: 20, surgeMin: 4, turbulence: 60, counterFlow: 55, smoothing: 1.5, spreadNoise: 0, criticalHold: 0 },
   // A general detector finds far fewer people per frame, so live defaults are lower.
   // Live counts flicker more, so they are averaged longer and small movement jitter is ignored.
-  live: { watch: 3, warning: 5, critical: 8, surgePct: 50, surgeWindow: 20, surgeMin: 2, turbulence: 60, counterFlow: 55, smoothing: 3, spreadNoise: 0.02 },
+  // Site-wide CRITICAL must also hold for 3 s, so one noisy frame cannot trigger it.
+  live: { watch: 4, warning: 6, critical: 10, surgePct: 50, surgeWindow: 20, surgeMin: 2, turbulence: 60, counterFlow: 55, smoothing: 3, spreadNoise: 0.02, criticalHold: 3 },
 }
 
 export function zoneLevel(count, s) {
@@ -41,6 +42,7 @@ const SURGE_COOLDOWN = 30
 const ZONE_ALERT_COOLDOWN = 3
 const LEVEL_REPEAT_GAP = 30 // seconds before the same zone can repeat the same level alert
 const DOWNGRADE_HOLD = 3 // overall level must stay lower this long before easing
+const SURGE_BASE = 3 // people; smallest base for surge percentages
 const FORECAST_WINDOW = 10 // seconds of history used to estimate each zone's growth rate
 const FORECAST_MIN_RATE = 0.15 // people per second; slower growth is treated as steady
 const FORECAST_HORIZON = 60 // only show forecasts within this many seconds
@@ -81,6 +83,7 @@ export class CrowdEngine {
     this.leadTimes = []
     this.overall = 0
     this.downSince = null
+    this.critSince = null
     this.alerts = []
     this.timeline = []
     this.lastTimelineT = -1e9
@@ -143,7 +146,9 @@ export class CrowdEngine {
     if (past) {
       sm.forEach((cur, i) => {
         const inc = cur - past[i]
-        const pct = (inc / Math.max(past[i], 1)) * 100
+        // Percent rise is measured from at least SURGE_BASE people, so a nearly empty zone gaining
+        // a few people is not reported as a 400% surge.
+        const pct = (inc / Math.max(past[i], SURGE_BASE)) * 100
         const stillRising = cur >= ref3[i] - 0.25
         if (inc >= s.surgeMin && pct >= s.surgePct && stillRising) {
           surges[i] = true
@@ -351,10 +356,19 @@ export class CrowdEngine {
       .filter(Boolean)
       .join(' and ')
 
-    if (computed > this.overall) {
-      this.overall = computed
+    // Optional hold before a site-wide CRITICAL (used in Live mode): stay at WARNING until it persists.
+    let target = computed
+    if (computed === 3 && this.overall < 3 && (s.criticalHold ?? 0) > 0) {
+      if (this.critSince === null) this.critSince = t
+      if (t - this.critSince < s.criticalHold) target = 2
+    } else if (computed < 3) {
+      this.critSince = null
+    }
+
+    if (target > this.overall) {
+      this.overall = target
       this.downSince = null
-      if (computed === 3) {
+      if (target === 3) {
         const top = shown.indexOf(Math.max(...shown))
         this.pushAlert({
           time: wall,
@@ -363,25 +377,25 @@ export class CrowdEngine {
           kind: 'site',
           title: 'Site-wide CRITICAL',
           message: `Crush risk building around ${name(top)}. Activate crowd-control protocol: open gate ${Z[top].gate}, stop announcements drawing people to the platform, dispatch officers.`,
-          why: `Overall rule: worst zone is ${LEVELS[worst].label} (${name(worstIdx)})${bump ? `, and ${bumpReason} raises it by one level` : ''}, giving CRITICAL.`,
+          why: `Overall rule: worst zone is ${LEVELS[worst].label} (${name(worstIdx)})${bump ? `, and ${bumpReason} raises it by one level` : ''}, giving CRITICAL${s.criticalHold ? ` for at least ${s.criticalHold}s` : ''}.`,
         })
       }
-    } else if (computed < this.overall) {
+    } else if (target < this.overall) {
       if (this.downSince === null) this.downSince = t
       if (t - this.downSince >= DOWNGRADE_HOLD) {
         const prev = this.overall
-        this.overall = computed
+        this.overall = target
         this.downSince = null
         this.pushAlert({
           time: wall,
           zone: 'SITE',
-          severity: computed,
+          severity: target,
           kind: 'site',
-          title: computed === 0 ? 'All clear' : 'Risk easing',
+          title: target === 0 ? 'All clear' : 'Risk easing',
           message:
-            computed === 0
+            target === 0
               ? 'All zones back to safe density. Keep gates open until the platform fully clears.'
-              : `Overall risk eased from ${LEVELS[prev].label} to ${LEVELS[computed].label}. Keep monitoring ${name(worstIdx)}.`,
+              : `Overall risk eased from ${LEVELS[prev].label} to ${LEVELS[target].label}. Keep monitoring ${name(worstIdx)}.`,
           why: `Overall rule: worst zone is now ${LEVELS[worst].label}${bump ? ` with ${bumpReason} active` : ' and no surge, turbulence or counter-flow is active'}. Downgrades wait ${DOWNGRADE_HOLD}s to avoid flip-flopping.`,
         })
       }
