@@ -24,7 +24,7 @@ export default function StatusCard({ snap }) {
       style={{ background: bg, borderColor: snap.overall ? lvl.color : 'var(--color-line-strong)', borderWidth: 1.5, borderRadius: 3 }}
       aria-live="polite"
     >
-      <div className="flex min-w-[250px] flex-1 items-center gap-4 px-4 py-2">
+      <div className="flex min-w-0 basis-full items-center gap-4 px-4 py-2 lg:min-w-[250px] lg:basis-0 lg:flex-1">
         <div>
           <div className="label" style={{ color: sub }}>
             Overall risk
@@ -41,7 +41,7 @@ export default function StatusCard({ snap }) {
         </p>
       </div>
 
-      <dl className="flex divide-x">
+      <dl className="grid w-full grid-cols-3 gap-y-1 pb-1 sm:grid-cols-6 lg:flex lg:w-auto lg:divide-x lg:pb-0">
         <Stat
           label="Critical in"
           value={snap.soonest ? pair(snap.soonest.name, `~${snap.soonest.eta}s`) : 'None'}
@@ -74,11 +74,11 @@ export default function StatusCard({ snap }) {
 
 function Stat({ label, value, unit, ink, sub, small, color }) {
   return (
-    <div className="flex min-w-[96px] max-w-[200px] flex-col justify-center px-4 py-2" style={{ borderColor: ink ? '#fbfaf740' : 'var(--color-line)' }}>
+    <div className="flex min-w-0 flex-col justify-center px-4 py-1 lg:min-w-[96px] lg:max-w-[200px] lg:py-2" style={{ borderColor: ink ? '#fbfaf740' : 'var(--color-line)' }}>
       <dt className="label" style={{ color: sub }}>
         {label}
       </dt>
-      <dd title={typeof value === 'string' ? value : undefined} className={`num truncate font-bold leading-7 ${small ? 'text-[15px]' : 'text-[22px]'}`} style={{ color: ink ?? color }}>
+      <dd title={typeof value === 'string' ? value : undefined} className={`num truncate font-bold leading-7 ${small ? 'text-[15px]' : 'text-[18px] lg:text-[22px]'}`} style={{ color: ink ?? color }}>
         {value}
         {unit && (
           <span className="ml-0.5 text-[12px] font-normal text-muted" style={{ color: sub }}>

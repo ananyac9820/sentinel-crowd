@@ -20,7 +20,7 @@ export default function TimelineView({ snap, sms, onReport, onAlertsCsv, onTimel
   const lead = snap.leadTimes[snap.leadTimes.length - 1]
 
   return (
-    <div className="grid h-full gap-3 lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_400px]">
+    <div className="grid gap-3 [&>*]:min-w-0 lg:h-full lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_400px]">
       <div className="flex flex-col gap-3 lg:min-h-0">
         <DensityChart className="min-h-[240px] lg:min-h-0 lg:flex-1" timeline={snap.timeline} now={snap.t} showTurbulence />
         <section className="panel">
@@ -61,7 +61,7 @@ export default function TimelineView({ snap, sms, onReport, onAlertsCsv, onTimel
 
       <div className="flex flex-col gap-3 lg:min-h-0">
         <AlertsFeed
-          className="lg:min-h-0 lg:flex-1"
+          className="max-lg:max-h-[70vh] lg:min-h-0 lg:flex-1"
           title="Alert history"
           alerts={snap.alerts.filter(test)}
           emptyText="No alerts of this type yet."

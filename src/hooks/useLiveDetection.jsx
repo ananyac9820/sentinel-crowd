@@ -5,7 +5,17 @@ import { Tracker } from '../lib/tracker.js'
 
 const DETECT_MS = 500
 const SLOW_LOAD_MS = 60000
-const WEBCAM = { id: 'webcam', label: 'Webcam (this laptop)', kind: 'webcam' }
+// Phones and tablets get both cameras; laptops get their webcam.
+const IS_MOBILE =
+  typeof window !== 'undefined' &&
+  (window.matchMedia?.('(pointer: coarse)').matches || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent))
+const CAMERAS = IS_MOBILE
+  ? [
+      { id: 'cam-back', label: 'Back camera', kind: 'webcam', facing: 'environment' },
+      { id: 'cam-front', label: 'Front camera', kind: 'webcam', facing: 'user' },
+    ]
+  : [{ id: 'cam-front', label: 'Webcam (this laptop)', kind: 'webcam', facing: 'user' }]
+const otherCamera = (id) => (id === 'cam-back' ? 'cam-front' : 'cam-back')
 
 function friendlyModelError(err) {
   const msg = String(err?.message || err)
@@ -13,7 +23,7 @@ function friendlyModelError(err) {
     return {
       title: 'Could not download the AI model',
       detail:
-        'This laptop looks offline, or the network is blocking the model server. Connect to the internet once. After that the model is cached on this laptop.',
+        'This device looks offline, or the network is blocking the model server. Connect to the internet once. After that the model is cached on this device.',
     }
   if (/webgl|backend/i.test(msg))
     return { title: 'The AI engine could not start', detail: 'This browser could not start WebGL. Try Chrome or Edge with hardware acceleration turned on.' }
@@ -75,7 +85,7 @@ export default function useLiveDetection({ active, onPeople, onSourceChange, onS
   const [error, setError] = useState(null)
   const [retry, setRetry] = useState(0)
 
-  const [sources, setSources] = useState([WEBCAM])
+  const [sources, setSources] = useState(CAMERAS)
   const [sourceId, setSourceId] = useState(null)
   const [feedError, setFeedError] = useState(null)
   const [videoLoading, setVideoLoading] = useState(false)
@@ -97,7 +107,7 @@ export default function useLiveDetection({ active, onPeople, onSourceChange, onS
       setStatus('error')
       setError({
         title: 'The AI model is taking too long',
-        detail: 'The network or this laptop seems slow. It will keep loading in the background, or you can switch to Simulation now.',
+        detail: 'The network or this device seems slow. It will keep loading in the background, or you can switch to Simulation now.',
       })
     }, SLOW_LOAD_MS)
     getDetector((m) => !cancelled && setStatusMsg(m))
@@ -148,7 +158,7 @@ export default function useLiveDetection({ active, onPeople, onSourceChange, onS
       setFeedError('This browser does not allow camera access on this page. Webcams need HTTPS or localhost. Upload an MP4 instead.')
     } else {
       navigator.mediaDevices
-        .getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false })
+        .getUserMedia({ video: { facingMode: { ideal: src.facing }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false })
         .then((stream) => {
           if (stale) return stream.getTracks().forEach((t) => t.stop())
           streamRef.current = stream
@@ -177,8 +187,8 @@ export default function useLiveDetection({ active, onPeople, onSourceChange, onS
     if (!active || !model || !sourceId) return
     let busy = false
     let stopped = false
-    // The webcam is shown mirrored like a video call, so mirror detections to match.
-    const mirrored = sourceId === WEBCAM.id
+    // The front camera is shown mirrored like a video call, so mirror detections to match.
+    const mirrored = sourcesRef.current.find((s) => s.id === sourceId)?.facing === 'user'
     const id = setInterval(async () => {
       const v = videoRef.current
       if (busy || !v || v.readyState < 2 || v.paused || v.ended || !v.videoWidth) return
@@ -275,6 +285,11 @@ export default function useLiveDetection({ active, onPeople, onSourceChange, onS
           {paused ? <PlayIcon size={12} /> : <PauseIcon size={12} />} {paused ? 'Play' : 'Pause'}
         </button>
       )}
+      {IS_MOBILE && current?.kind === 'webcam' && (
+        <button className="btn" onClick={() => setSourceId(otherCamera(current.id))} title="Switch between front and back camera">
+          Switch to {current.id === 'cam-back' ? 'front' : 'back'}
+        </button>
+      )}
       {upload(false)}
     </>
   )
@@ -287,7 +302,7 @@ export default function useLiveDetection({ active, onPeople, onSourceChange, onS
         playsInline
         loop
         className="absolute inset-0 h-full w-full object-fill"
-        style={current?.kind === 'webcam' ? { transform: 'scaleX(-1)' } : undefined}
+        style={current?.facing === 'user' ? { transform: 'scaleX(-1)' } : undefined}
         onLoadedMetadata={(e) => e.target.videoWidth && setAspect(e.target.videoWidth / e.target.videoHeight)}
         onLoadedData={() => setVideoLoading(false)}
         onPlaying={() => setVideoLoading(false)}
@@ -352,9 +367,11 @@ export default function useLiveDetection({ active, onPeople, onSourceChange, onS
         actions={
           <>
             {upload(true)}
-            <button className="btn" onClick={() => setSourceId(WEBCAM.id)}>
-              Use webcam
-            </button>
+            {CAMERAS.map((c) => (
+              <button key={c.id} className="btn" onClick={() => setSourceId(c.id)}>
+                {IS_MOBILE ? `Use ${c.label.toLowerCase()}` : 'Use webcam'}
+              </button>
+            ))}
           </>
         }
       >
@@ -362,7 +379,7 @@ export default function useLiveDetection({ active, onPeople, onSourceChange, onS
       </Notice>
     )
   } else if (videoLoading) {
-    overlay = <FeedSkeleton message={current.kind === 'webcam' ? 'Starting webcam…' : 'Loading video…'} />
+    overlay = <FeedSkeleton message={current.kind === 'webcam' ? `Starting ${current.label.toLowerCase()}…` : 'Loading video…'} />
   }
 
   return {

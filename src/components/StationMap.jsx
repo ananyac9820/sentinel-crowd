@@ -31,7 +31,7 @@ export default function StationMap({ mode, mainSnap, sideSnaps, plan, t, onOpenM
   const worst = cams.reduce((w, c) => (c.snap && c.snap.overall > w.level ? { level: c.snap.overall, cam: c } : w), { level: 0, cam: null })
 
   return (
-    <div className="grid h-full gap-3 lg:grid-cols-[minmax(0,1fr)_340px] lg:min-h-0">
+    <div className="grid gap-3 [&>*]:min-w-0 lg:h-full lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_340px]">
       <section className="panel flex flex-col lg:min-h-0">
         <div className="panel-head">
           <span className="label">Station map</span>

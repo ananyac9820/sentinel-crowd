@@ -37,7 +37,7 @@ export default function Landing({ onOpen }) {
       </header>
 
       <main className="mx-auto w-full max-w-[1200px] flex-1 px-6">
-        <section className="grid items-start gap-8 py-8 lg:grid-cols-[340px_minmax(0,1fr)]">
+        <section className="grid items-start gap-8 py-8 [&>*]:min-w-0 lg:grid-cols-[340px_minmax(0,1fr)]">
           <div className="lg:pt-6">
             <h1 className="text-[32px] font-bold leading-tight">Sentinel Crowd</h1>
             <p className="mt-3 text-[16px] leading-relaxed text-muted">
@@ -117,7 +117,7 @@ function LivePreview() {
       {snap ? (
         <div className="grid gap-2 p-2">
           <StatusCard snap={snap} />
-          <div className="grid gap-2 md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+          <div className="grid gap-2 [&>*]:min-w-0 md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
             <div className="relative aspect-video overflow-hidden bg-[#f6f5f1]" style={{ borderRadius: 2 }}>
               <SimulatedFeed countsRef={countsRef} motionRef={motionRef} running />
               <ZoneGrid snap={snap} />

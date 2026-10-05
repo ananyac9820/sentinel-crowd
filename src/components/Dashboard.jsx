@@ -255,22 +255,22 @@ export default function Dashboard({ onHome }) {
 
   return (
     <div
-      className="flex h-full flex-col border-2 transition-colors duration-[1500ms] max-lg:overflow-y-auto lg:overflow-hidden"
+      className="flex min-h-full flex-col border-2 transition-colors duration-[1500ms] lg:h-full lg:overflow-hidden"
       style={{ borderColor: critical ? 'var(--color-crit)' : 'var(--color-bg)' }}
     >
-      <header className="flex flex-wrap items-end gap-x-4 gap-y-1 border-b-[3px] border-line-strong bg-panel px-3 pt-1.5">
-        <button onClick={onHome} className="flex items-center gap-2 self-center pb-1.5 text-fg hover:text-black" title="Back to home page">
+      <header className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b-[3px] border-line-strong bg-panel px-3 pt-1.5 lg:items-end">
+        <button onClick={onHome} className="flex items-center gap-2 pb-1.5 text-fg hover:text-black lg:self-center" title="Back to home page">
           <Logo size={20} />
-          <span className="font-bold">Sentinel Crowd</span>
+          <span className="font-bold max-sm:hidden">Sentinel Crowd</span>
         </button>
-        <nav className="flex" role="tablist" aria-label="Sections">
+        <nav className="order-last -mx-3 flex w-[calc(100%+1.5rem)] overflow-x-auto px-1 lg:order-none lg:mx-0 lg:w-auto lg:px-0" role="tablist" aria-label="Sections">
           {TABS.map(([key, label], i) => (
             <button key={key} role="tab" aria-selected={tab === key} onClick={() => setTab(key)} className="tab" title={`Shortcut: ${i + 1}`}>
               {label}
             </button>
           ))}
         </nav>
-        <div className="ml-auto flex items-center gap-2 self-center pb-1.5">
+        <div className="ml-auto flex items-center gap-2 pb-1.5 lg:self-center">
           <button
             onClick={() => setNotify((n) => ({ ...n, sound: !n.sound }))}
             className="btn"
@@ -281,9 +281,9 @@ export default function Dashboard({ onHome }) {
           </button>
           <div className="flex border border-line-strong" role="tablist" aria-label="Mode" style={{ borderRadius: 2 }}>
             {[
-              ['sim', 'Simulation'],
-              ['live', 'Live detection'],
-            ].map(([key, label]) => (
+              ['sim', 'Simulation', 'Sim'],
+              ['live', 'Live detection', 'Live'],
+            ].map(([key, label, short]) => (
               <button
                 key={key}
                 role="tab"
@@ -291,7 +291,8 @@ export default function Dashboard({ onHome }) {
                 onClick={() => switchMode(key)}
                 className={`h-7 px-3 text-[12px] font-bold transition-colors ${mode === key ? 'bg-accent text-[#f6f5f1]' : 'bg-raised text-muted hover:text-fg'}`}
               >
-                {label}
+                <span className="max-sm:hidden">{label}</span>
+                <span className="sm:hidden">{short}</span>
               </button>
             ))}
           </div>
@@ -302,8 +303,8 @@ export default function Dashboard({ onHome }) {
         <StatusCard snap={snap} />
       </div>
 
-      <main className="min-h-0 flex-1 p-3">
-        <div className={tab === 'monitor' ? 'grid h-full gap-3 lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_380px]' : 'hidden'}>
+      <main className="flex-1 p-3 lg:min-h-0">
+        <div className={tab === 'monitor' ? 'grid gap-3 [&>*]:min-w-0 lg:h-full lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_380px]' : 'hidden'}>
           <div className="flex flex-col gap-3 lg:min-h-0">
             <CameraPanel
               className="lg:min-h-0 lg:flex-1"
@@ -327,13 +328,13 @@ export default function Dashboard({ onHome }) {
             />
             <DensityChart compact className="h-[118px] shrink-0" timeline={snap.timeline} now={snap.t} />
           </div>
-          <AlertsFeed alerts={snap.alerts} className="lg:min-h-0" />
+          <AlertsFeed alerts={snap.alerts} className="max-lg:max-h-[70vh] lg:min-h-0" />
         </div>
 
         {tab === 'station' && <StationMap mode={mode} mainSnap={snap} sideSnaps={sideSnaps} plan={plan} t={simT} onOpenMonitor={() => setTab('monitor')} />}
 
         {tab === 'zones' && (
-          <div className="grid h-full gap-3 lg:min-h-0 lg:grid-cols-[400px_minmax(0,1fr)]">
+          <div className="grid gap-3 [&>*]:min-w-0 lg:h-full lg:min-h-0 lg:grid-cols-[400px_minmax(0,1fr)]">
             <section className="panel self-start">
               <div className="panel-head">
                 <span className="label">Zone map</span>
@@ -363,7 +364,7 @@ export default function Dashboard({ onHome }) {
         )}
 
         {tab === 'setup' && (
-          <div className="grid h-full gap-3 lg:min-h-0 lg:grid-cols-[380px_minmax(0,1fr)]">
+          <div className="grid gap-3 [&>*]:min-w-0 lg:h-full lg:min-h-0 lg:grid-cols-[380px_minmax(0,1fr)]">
             <div className="flex flex-col gap-3 lg:min-h-0">
               <SettingsPanel mode={mode} value={settings[mode]} onChange={(v) => setSettings((s) => ({ ...s, [mode]: v }))} className="lg:min-h-0 lg:flex-1" />
               <NotifyPanel notify={notify} onChange={setNotify} />
@@ -374,13 +375,13 @@ export default function Dashboard({ onHome }) {
       </main>
 
       <Footer className="px-3 pb-2">
-        <p className="num text-dim" aria-label="Keyboard shortcuts">
+        <p className="num text-dim max-lg:hidden" aria-label="Keyboard shortcuts">
           <Kbd>Space</Kbd> pause <Kbd>R</Kbd> restart <Kbd>F</Kbd> fullscreen <Kbd>1-5</Kbd> tabs
         </p>
       </Footer>
 
       {toast && (
-        <div className="panel fixed bottom-10 right-4 z-40 w-[340px] px-3 py-2" role="status">
+        <div className="panel fixed inset-x-3 bottom-3 z-40 px-3 py-2 sm:left-auto sm:right-4 sm:bottom-10 sm:w-[340px]" role="status">
           <p className="label text-crit">SMS sent (simulated)</p>
           <p className="num text-[11px] text-dim">To: {toast.to}</p>
           <p className="mt-0.5 text-[12px] leading-snug">{toast.text}</p>
