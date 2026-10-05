@@ -14,7 +14,7 @@ async function loadModel(onStatus) {
   try {
     const models = await tf.io.listModels()
     if (models[CACHE_URL]) {
-      onStatus?.('Loading AI model from this laptop’s cache…')
+      onStatus?.('Loading AI model from this device’s cache…')
       return { model: await cocoSsd.load({ base: BASE, modelUrl: CACHE_URL }), cached: true, backend: tf.getBackend() }
     }
   } catch {

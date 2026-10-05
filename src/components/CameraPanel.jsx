@@ -14,13 +14,13 @@ export default function CameraPanel({ mode, snap, countsRef, motionRef, sim, liv
     <section className={`panel flex flex-col ${className}`}>
       <div className="panel-head">
         <span className="label">Camera</span>
-        <span className="num truncate text-[13px] text-fg">
+        <span className="num min-w-0 truncate text-[13px] text-fg">
           {mode === 'sim' ? 'CAM-03 Platform 2, Central Junction' : live?.title || 'No source selected'}
         </span>
         <span className="num shrink-0 whitespace-nowrap border border-line px-1.5 text-[10px] tracking-wider text-muted" style={{ borderRadius: 2 }}>
           {mode === 'sim' ? 'SIMULATED' : 'AI DETECTION'}
         </span>
-        <div className="ml-auto flex items-center gap-1.5">{mode === 'sim' ? <SimControls sim={sim} /> : live?.controls}</div>
+        <div className="ml-auto flex flex-wrap items-center gap-1.5">{mode === 'sim' ? <SimControls sim={sim} /> : live?.controls}</div>
       </div>
 
       <div className="relative flex flex-1 items-center justify-center p-2 [container-type:size] max-lg:aspect-video lg:min-h-[200px]">
