@@ -11,7 +11,7 @@ const FIELDS = [
   { key: 'counterFlow', label: 'Counter-flow alert at', unit: 'out of 100' },
 ]
 
-// Alert thresholds for the current mode (Simulation and Live keep separate values).
+// Alert thresholds for the current profile (Simulation, Live detector and Live density model keep separate values).
 export default function SettingsPanel({ mode, value, onChange, className = '' }) {
   const set = (k, v) => onChange({ ...value, [k]: Math.max(1, Math.min(k === 'turbulence' || k === 'counterFlow' ? 100 : 999, Number(v) || 1)) })
   const invalid = !(value.watch < value.warning && value.warning < value.critical)
@@ -20,7 +20,7 @@ export default function SettingsPanel({ mode, value, onChange, className = '' })
     <section className={`panel flex flex-col ${className}`}>
       <div className="panel-head">
         <span className="label">Alert thresholds</span>
-        <span className="text-[12px] text-muted">{mode === 'sim' ? 'Simulation' : 'Live detection'}</span>
+        <span className="text-[12px] text-muted">{mode === 'sim' ? 'Simulation' : mode === 'density' ? 'Live, crowd density model' : 'Live, people detector'}</span>
         <button onClick={() => onChange(DEFAULT_SETTINGS[mode])} className="btn ml-auto">
           Reset
         </button>

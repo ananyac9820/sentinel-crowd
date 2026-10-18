@@ -1,0 +1,6 @@
+torch
+onnx
+onnxruntime
+onnxscript
+opencv-python-headless
+numpy

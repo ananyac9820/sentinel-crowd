@@ -1,5 +1,5 @@
 export const DISCLAIMER =
-  'Prototype. Person detection uses a general model and may undercount in very dense crowds; production version would use a crowd-density model.'
+  'Prototype. Live counts come from a crowd density model trained on public datasets (ShanghaiTech), not on this camera; treat them as estimates and confirm on the ground.'
 
 export default function Footer({ className = '', children }) {
   return (

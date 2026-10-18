@@ -1,9 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { UploadIcon, PlayIcon, PauseIcon, AlertIcon } from '../components/Icons.jsx'
 import { getDetector } from '../lib/detector.js'
+import { getDensityModel, estimateDensity } from '../lib/densityModel.js'
+import { heatColor, robustPeak } from '../lib/density.js'
 import { Tracker } from '../lib/tracker.js'
 
 const DETECT_MS = 500
+const DENSITY_MS = 250 // try this often; a new frame starts only when the previous one has finished
+export const COUNTING = {
+  density: { label: 'Crowd density model', short: 'Density model' },
+  detector: { label: 'People detector', short: 'Detector' },
+}
 const SLOW_LOAD_MS = 60000
 // Phones and tablets get both cameras; laptops get their webcam.
 const IS_MOBILE =
@@ -65,9 +72,13 @@ function FeedSkeleton({ message, action }) {
   )
 }
 
-// Live Detection: COCO-SSD person detection on an uploaded video or webcam, sampled every
-// 500 ms. Reports each person's position (0..1) and, when tracked, their velocity.
-export default function useLiveDetection({ active, onPeople, onSourceChange, onSwitchToSim }) {
+// Live Detection on an uploaded video or webcam.
+//   - COCO-SSD person detection every 500 ms: each person's position (0..1) and, when tracked, velocity.
+//     This drives movement analysis (turbulence, counter-flow).
+//   - With counting = 'density', the DM-Count crowd density model also runs on each frame it can.
+//     Its density map gives the counts, because it keeps working when people overlap and a detector
+//     cannot box them separately.
+export default function useLiveDetection({ active, counting = 'density', onCountingChange, onPeople, onDensity, onSourceChange, onSwitchToSim }) {
   const videoRef = useRef(null)
   const fileRef = useRef(null)
   const streamRef = useRef(null)
@@ -77,6 +88,18 @@ export default function useLiveDetection({ active, onPeople, onSourceChange, onS
   onPeopleRef.current = onPeople
   const onSourceChangeRef = useRef(onSourceChange)
   onSourceChangeRef.current = onSourceChange
+  const onDensityRef = useRef(onDensity)
+  onDensityRef.current = onDensity
+  const heatRef = useRef(null)
+  const useDensity = counting === 'density'
+
+  // Crowd density model state (loaded only when density counting is selected).
+  const [densityModel, setDensityModel] = useState(null)
+  const [densityStatus, setDensityStatus] = useState('idle') // idle | loading | ready | error
+  const [densityMsg, setDensityMsg] = useState('')
+  const [densityError, setDensityError] = useState(null)
+  const [densityRetry, setDensityRetry] = useState(0)
+  const [densityStats, setDensityStats] = useState(null) // { count, ms }
 
   const [model, setModel] = useState(null)
   const [modelInfo, setModelInfo] = useState(null)
@@ -130,6 +153,29 @@ export default function useLiveDetection({ active, onPeople, onSourceChange, onS
       clearTimeout(slow)
     }
   }, [active, model, retry])
+
+  // ---- Load the crowd density model when density counting is on ----
+  useEffect(() => {
+    if (!active || !useDensity || densityModel) return
+    let cancelled = false
+    setDensityStatus('loading')
+    setDensityError(null)
+    getDensityModel((m) => !cancelled && setDensityMsg(m))
+      .then((r) => {
+        if (cancelled) return
+        setDensityModel(r)
+        setDensityStatus('ready')
+      })
+      .catch((e) => {
+        if (cancelled) return
+        console.error(e)
+        setDensityStatus('error')
+        setDensityError(String(e?.message || e).slice(0, 200))
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [active, useDensity, densityModel, densityRetry])
 
   // ---- Attach the selected source to the <video> ----
   const stopStream = () => {
@@ -223,6 +269,41 @@ export default function useLiveDetection({ active, onPeople, onSourceChange, onS
     }
   }, [active, model, sourceId])
 
+  // ---- Density loop: as fast as the model allows, never two frames at once ----
+  useEffect(() => {
+    if (!active || !useDensity || !densityModel || !sourceId) return
+    let busy = false
+    let stopped = false
+    const mirrored = sourcesRef.current.find((s) => s.id === sourceId)?.facing === 'user'
+    const id = setInterval(async () => {
+      const v = videoRef.current
+      if (busy || !v || v.readyState < 2 || v.paused || v.ended || !v.videoWidth) return
+      busy = true
+      try {
+        const r = await estimateDensity(densityModel, v)
+        if (stopped) return
+        drawHeatmap(heatRef.current, r)
+        setDensityStats({ count: r.count, ms: r.ms })
+        onDensityRef.current?.({ ...r, mirrored, at: performance.now() })
+      } catch (e) {
+        console.error(e)
+      } finally {
+        busy = false
+      }
+    }, DENSITY_MS)
+    return () => {
+      stopped = true
+      clearInterval(id)
+    }
+  }, [active, useDensity, densityModel, sourceId])
+
+  // Clear the stale heatmap and numbers when the source or counting method changes.
+  useEffect(() => {
+    setDensityStats(null)
+    const c = heatRef.current
+    c?.getContext('2d').clearRect(0, 0, c.width, c.height)
+  }, [sourceId, useDensity])
+
   // Release the webcam when leaving the dashboard.
   useEffect(() => () => stopStream(), [])
 
@@ -263,6 +344,20 @@ export default function useLiveDetection({ active, onPeople, onSourceChange, onS
   const controls = (
     <>
       {fileInput}
+      <select
+        value={counting}
+        onChange={(e) => onCountingChange?.(e.target.value)}
+        className="h-7 border border-line-strong bg-raised px-1.5 text-[12px] text-fg"
+        style={{ borderRadius: 2 }}
+        aria-label="Counting method"
+        title="How people are counted. The density model handles packed crowds; the detector boxes individual people."
+      >
+        {Object.entries(COUNTING).map(([k, c]) => (
+          <option key={k} value={k}>
+            {c.label}
+          </option>
+        ))}
+      </select>
       <span className="num hidden whitespace-nowrap text-[11px] text-dim 2xl:inline" title={modelInfo ? `Backend: ${modelInfo.backend}` : undefined}>
         {ready ? (modelInfo?.cached ? 'Model ready, cached' : 'Model ready') : status === 'loading' ? 'Loading model' : 'Model not loaded'}
       </span>
@@ -314,7 +409,32 @@ export default function useLiveDetection({ active, onPeople, onSourceChange, onS
           setFeedError('This video cannot be played in the browser. Try an H.264 MP4.')
         }}
       />
+      <canvas
+        ref={heatRef}
+        className="pointer-events-none absolute inset-0 h-full w-full"
+        style={{ display: showGrid && useDensity ? 'block' : 'none', transform: current?.facing === 'user' ? 'scaleX(-1)' : undefined, imageRendering: 'auto' }}
+      />
+      {showGrid && useDensity && (
+        <div className="num pointer-events-none absolute left-2 top-2 z-[5] bg-[#111111e0] px-2 py-1 text-[11px] leading-tight text-[#f6f5f1]" style={{ borderRadius: 2 }}>
+          {densityStatus === 'ready' ? (
+            densityStats ? (
+              <>
+                <span className="text-[14px] font-bold">≈ {Math.round(densityStats.count)}</span> people (density model)
+                <br />
+                Detector boxes: {boxes.length} · {Math.round(densityStats.ms)} ms/frame on {densityModel?.backend === 'webgpu' ? 'GPU' : 'CPU'}
+              </>
+            ) : (
+              'Density model ready, waiting for a frame…'
+            )
+          ) : densityStatus === 'error' ? (
+            'Density model failed; counting with the detector'
+          ) : (
+            densityMsg || 'Loading crowd density model…'
+          )}
+        </div>
+      )}
       {showGrid &&
+        !useDensity &&
         boxes.map((b, i) => (
           <div
             key={i}
@@ -343,6 +463,25 @@ export default function useLiveDetection({ active, onPeople, onSourceChange, onS
         }
       >
         {error?.detail}
+      </Notice>
+    )
+  } else if (useDensity && densityStatus === 'error') {
+    overlay = (
+      <Notice
+        tone="error"
+        title="The crowd density model could not load"
+        actions={
+          <>
+            <button className="btn btn-primary" onClick={() => onCountingChange?.('detector')}>
+              Use the people detector
+            </button>
+            <button className="btn" onClick={() => setDensityRetry((r) => r + 1)}>
+              Try again
+            </button>
+          </>
+        }
+      >
+        {densityError} The model file is created by tools/density-model (see its README) and served from public/models.
       </Notice>
     )
   } else if (feedError) {
@@ -375,7 +514,7 @@ export default function useLiveDetection({ active, onPeople, onSourceChange, onS
           </>
         }
       >
-        A high-angle or overhead crowd clip works best. People are counted into the 4x3 zone grid twice a second. The video stays on this device.
+        A high-angle crowd clip works best. {useDensity ? 'The crowd density model counts people even where they overlap; the detector tracks movement.' : 'People are counted into the 4x3 zone grid twice a second.'} The video stays on this device.
       </Notice>
     )
   } else if (videoLoading) {
@@ -391,4 +530,26 @@ export default function useLiveDetection({ active, onPeople, onSourceChange, onS
     controls,
     togglePlay,
   }
+}
+
+// Paints the density map as a translucent heatmap. The canvas is the size of the density map and is
+// stretched over the video by CSS, which smooths it.
+function drawHeatmap(canvas, { density, w, h }) {
+  if (!canvas) return
+  if (canvas.width !== w || canvas.height !== h) {
+    canvas.width = w
+    canvas.height = h
+  }
+  const ctx = canvas.getContext('2d')
+  const img = ctx.createImageData(w, h)
+  // Colour scale follows this frame's peak, with a floor so near-empty scenes stay transparent.
+  const max = Math.max(0.05, robustPeak(density))
+  for (let i = 0; i < density.length; i++) {
+    const [r, g, b, a] = heatColor(density[i], max)
+    img.data[i * 4] = r
+    img.data[i * 4 + 1] = g
+    img.data[i * 4 + 2] = b
+    img.data[i * 4 + 3] = a
+  }
+  ctx.putImageData(img, 0, 0)
 }

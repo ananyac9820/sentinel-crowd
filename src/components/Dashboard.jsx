@@ -12,13 +12,19 @@ import ZoneEditor from './ZoneEditor.jsx'
 import SitePanel from './SitePanel.jsx'
 import StationMap from './StationMap.jsx'
 import TimelineView from './TimelineView.jsx'
+import DaaEngineView from './daa/DaaEngineView.jsx'
+import AlgorithmAnalysis from './daa/AlgorithmAnalysis.jsx'
 import useLiveDetection from '../hooks/useLiveDetection.jsx'
 import { CrowdEngine, DEFAULT_SETTINGS, emptySnapshot } from '../lib/risk.js'
 import { DEFAULT_ZONES, GRID_CELLS, aggregateGrid, aggregatePeople, finalise } from '../lib/zones.js'
+import { zoneCountsFromDensity } from '../lib/density.js'
 import { AUTO_INTERVENTION_AT, STATION_CAMERAS, simGrid, sideGrid, stepSimulation } from '../lib/simulation.js'
 import { playAlarm, unlockAudio } from '../lib/alarm.js'
 import { cloneProfile } from '../lib/site.js'
 import { alertsCsv, download, openReport, timelineCsv } from '../lib/report.js'
+import { runDaaAnalysis } from '../engine/decisionEngine.js'
+import { projectSimRisk } from '../engine/riskProjection.js'
+import { EMERGENCY_T, makeSideEngines, replayScenario } from '../engine/emergencyScenario.js'
 
 const TICK_MS = 500
 const TABS = [
@@ -27,6 +33,8 @@ const TABS = [
   ['zones', 'Zones'],
   ['timeline', 'Timeline'],
   ['setup', 'Setup'],
+  ['daa', 'DAA Engine'],
+  ['analysis', 'Algorithm Analysis'],
 ]
 const SIDE_IDS = STATION_CAMERAS.filter((c) => !c.main).map((c) => c.id)
 
@@ -54,7 +62,11 @@ const loadZones = () => {
 export default function Dashboard({ onHome }) {
   const [tab, setTab] = useState('monitor')
   const [mode, setMode] = useState('sim') // Simulation is the default so the demo never fails on stage.
+  // Live counting method: the crowd density model (default) or the people detector.
+  const [counting, setCounting] = useState(() => (load('sentinel.counting.v1', 'density') === 'detector' ? 'detector' : 'density'))
   const [settings, setSettings] = useState(DEFAULT_SETTINGS)
+  // Threshold profile in use: Simulation, Live with the detector, or Live with the density model.
+  const profile = mode === 'live' && counting === 'density' ? 'density' : mode
   const [zones, setZones] = useState(loadZones)
   // Simulation uses the configured railway platform; Live starts unconfigured (generic advice).
   const [sites, setSites] = useState(() => load('sentinel.site.v1', { sim: cloneProfile('station'), live: cloneProfile('generic') }))
@@ -63,27 +75,23 @@ export default function Dashboard({ onHome }) {
   const [notify, setNotify] = useState(() => load('sentinel.notify.v1', { sound: true, sms: true, to: 'Station Master, Central Junction' }))
   const [sms, setSms] = useState([])
   const [toast, setToast] = useState(null)
+  const [analysis, setAnalysis] = useState(null) // last DAA decision-engine result
+  const [planApplied, setPlanApplied] = useState(null)
 
   const engineRef = useRef(null)
   if (!engineRef.current) engineRef.current = new CrowdEngine(settings.sim, zones, sites.sim)
   const engine = engineRef.current
   const sideRef = useRef(null)
-  if (!sideRef.current)
-    sideRef.current = Object.fromEntries(
-      SIDE_IDS.map((id) => {
-        const short = STATION_CAMERAS.find((c) => c.id === id).short
-        return [id, new CrowdEngine(DEFAULT_SETTINGS.sim, finalise(DEFAULT_ZONES.map((z) => ({ ...z, name: `${short} ${z.id}` }))))]
-      }),
-    )
+  if (!sideRef.current) sideRef.current = makeSideEngines()
   const countsRef = useRef(Array(GRID_CELLS).fill(0))
   const motionRef = useRef(null)
   const zonesRef = useRef(zones)
   zonesRef.current = zones
 
   useEffect(() => {
-    engine.settings = settings[mode]
+    engine.settings = settings[profile]
     engine.site = sites[mode]
-  }, [engine, settings, sites, mode])
+  }, [engine, settings, sites, mode, profile])
 
   // ---- Simulation clock and interventions ----
   const [simT, setSimT] = useState(0)
@@ -112,6 +120,8 @@ export default function Dashboard({ onHome }) {
     setManual([])
     setSms([])
     setPlaying(true)
+    setAnalysis(null)
+    setPlanApplied(null)
   }, [engine])
 
   useEffect(() => {
@@ -141,6 +151,57 @@ export default function Dashboard({ onHome }) {
     restartSim()
   }, [restartSim])
 
+  // ---- DAA decision engine ----
+  // "Emergency Crowd Surge": replay the scripted scenario to 0:58 with no automatic response, then pause.
+  const loadEmergency = () => {
+    if (mode !== 'sim') {
+      engine.settings = settings.sim
+      engine.site = sites.sim
+      setMode('sim')
+    }
+    const wallStart = Date.now() - EMERGENCY_T * 1000
+    simRef.current = { t: EMERGENCY_T, wallStart }
+    const replay = replayScenario({ engine, sideEngines: sideRef.current, zones: zonesRef.current, toT: EMERGENCY_T, plan: [], wallStart })
+    countsRef.current = replay.grid.counts
+    motionRef.current = replay.grid.motion
+    setAuto(false)
+    setManual([])
+    setSms([])
+    setSnap(replay.snap)
+    setSideSnaps(replay.sideSnaps)
+    setSimT(EMERGENCY_T)
+    setPlaying(false)
+    setAnalysis(null)
+    setPlanApplied(null)
+  }
+
+  // Runs the whole pipeline on the crowd state currently on screen. The simulation pauses so the
+  // numbers on every tab match the analysis.
+  const runAnalysis = () => {
+    const sim = mode === 'sim'
+    if (sim) setPlaying(false)
+    const tNow = simRef.current.t
+    const active = sim ? planRef.current.filter((iv) => tNow >= iv.at) : []
+    const result = runDaaAnalysis({
+      snap,
+      settings: settings[profile],
+      site: sites[mode],
+      sideSnaps: sim ? sideSnaps : {},
+      applied: active.map((iv) => iv.type),
+      projectRisk: sim ? (extra) => projectSimRisk({ tNow, basePlan: planRef.current, extra, zones: zonesRef.current, settings: settings.sim, site: sites.sim }) : null,
+    })
+    setAnalysis({ ...result, at: tNow, mode })
+    setPlanApplied(null)
+  }
+
+  // Apply the greedy plan to the running simulation (the same actions as the what-if buttons).
+  const applyPlan = (types) => {
+    const at = simRef.current.t
+    setManual((m) => [...m, ...types.filter((type) => !m.some((iv) => iv.type === type)).map((type) => ({ type, at }))])
+    setPlanApplied({ at, types, riskAt: { score: snap.score, level: snap.overall } })
+    setPlaying(true)
+  }
+
   const intervene = (type) => {
     if (manual.some((iv) => iv.type === type)) return
     setManual((m) => [...m, { type, at: simRef.current.t }])
@@ -149,7 +210,7 @@ export default function Dashboard({ onHome }) {
   const switchMode = (m) => {
     if (m === mode) return
     engine.reset()
-    engine.settings = settings[m]
+    engine.settings = settings[m === 'live' && counting === 'density' ? 'density' : m]
     engine.site = sites[m]
     setSnap(emptySnapshot(zones))
     setSms([])
@@ -180,19 +241,49 @@ export default function Dashboard({ onHome }) {
   }
 
   // ---- Live detection ----
+  // Movement always comes from the detector's tracked people. Counts come from the density model when
+  // it is selected (and has a recent frame), otherwise from the detector.
+  const densityRef = useRef(null)
+  const countingRef = useRef(counting)
+  countingRef.current = counting
+  const DENSITY_FRESH_MS = 3000
   const onLivePeople = useCallback(
     (people) => {
       const agg = aggregatePeople(people, zonesRef.current)
-      setSnap(engine.step(agg.counts, performance.now() / 1000, Date.now(), agg.motion))
+      let counts = agg.counts
+      if (countingRef.current === 'density') {
+        const d = densityRef.current
+        // No fresh density map yet: wait rather than mix detector and density counts (that would look like a surge).
+        if (!d || performance.now() - d.at > DENSITY_FRESH_MS) return
+        counts = zoneCountsFromDensity(d.density, d.w, d.h, zonesRef.current, { mirrored: d.mirrored })
+      }
+      setSnap(engine.step(counts, performance.now() / 1000, Date.now(), agg.motion))
     },
     [engine],
   )
+  const onLiveDensity = useCallback((d) => {
+    densityRef.current = d
+  }, [])
   const onLiveSource = useCallback(() => {
     engine.reset()
+    densityRef.current = null
     setSnap(emptySnapshot(zonesRef.current))
     setSms([])
   }, [engine])
-  const live = useLiveDetection({ active: mode === 'live', onPeople: onLivePeople, onSourceChange: onLiveSource, onSwitchToSim: () => switchMode('sim') })
+  const changeCounting = (c) => {
+    setCounting(c)
+    save('sentinel.counting.v1', c)
+    onLiveSource() // a different counting method starts a fresh analysis
+  }
+  const live = useLiveDetection({
+    active: mode === 'live',
+    counting,
+    onCountingChange: changeCounting,
+    onPeople: onLivePeople,
+    onDensity: onLiveDensity,
+    onSourceChange: onLiveSource,
+    onSwitchToSim: () => switchMode('sim'),
+  })
 
   // ---- Alarm sound and simulated SMS for serious alerts ----
   const seenRef = useRef(0)
@@ -247,7 +338,7 @@ export default function Dashboard({ onHome }) {
       } else if (e.key === 'f' || e.key === 'F') {
         if (document.fullscreenElement) document.exitFullscreen?.()
         else document.documentElement.requestFullscreen?.().catch(() => {})
-      } else if (/^[1-5]$/.test(e.key)) {
+      } else if (/^[1-7]$/.test(e.key)) {
         setTab(TABS[Number(e.key) - 1][0])
       }
     }
@@ -369,7 +460,7 @@ export default function Dashboard({ onHome }) {
                 Change zones, exits and entries on the <button className="link" onClick={() => setTab('setup')}>Setup</button> tab. Alerts name the nearest configured exit; with no site configured they name none.
               </p>
             </section>
-            <ZoneTable snap={snap} settings={settings[mode]} site={sites[mode]} className="lg:min-h-0" />
+            <ZoneTable snap={snap} settings={settings[profile]} site={sites[mode]} className="lg:min-h-0" />
           </div>
         )}
 
@@ -386,7 +477,7 @@ export default function Dashboard({ onHome }) {
         {tab === 'setup' && (
           <div className="grid gap-3 [&>*]:min-w-0 lg:h-full lg:min-h-0 lg:grid-cols-[380px_minmax(0,1fr)]">
             <div className="flex flex-col gap-3 lg:min-h-0">
-              <SettingsPanel mode={mode} value={settings[mode]} onChange={(v) => setSettings((s) => ({ ...s, [mode]: v }))} className="lg:min-h-0 lg:flex-1" />
+              <SettingsPanel mode={profile} value={settings[profile]} onChange={(v) => setSettings((s) => ({ ...s, [profile]: v }))} className="lg:min-h-0 lg:flex-1" />
               <NotifyPanel notify={notify} onChange={setNotify} />
             </div>
             <div className="flex flex-col gap-3 lg:min-h-0 lg:overflow-y-auto">
@@ -395,11 +486,27 @@ export default function Dashboard({ onHome }) {
             </div>
           </div>
         )}
+
+        {tab === 'daa' && (
+          <DaaEngineView
+            analysis={analysis}
+            live={{ snap, settings: settings[profile], site: sites[mode], sideSnaps: mode === 'sim' ? sideSnaps : {}, applied: mode === 'sim' ? plan.filter((iv) => simT >= iv.at).map((iv) => iv.type) : [] }}
+            mode={mode}
+            simT={simT}
+            snap={snap}
+            planApplied={planApplied}
+            onLoadEmergency={loadEmergency}
+            onRun={runAnalysis}
+            onApplyPlan={applyPlan}
+          />
+        )}
+
+        {tab === 'analysis' && <AlgorithmAnalysis analysis={analysis} />}
       </main>
 
       <Footer className="px-3 pb-2">
         <p className="num text-dim max-lg:hidden" aria-label="Keyboard shortcuts">
-          <Kbd>Space</Kbd> pause <Kbd>R</Kbd> restart <Kbd>F</Kbd> fullscreen <Kbd>1-5</Kbd> tabs
+          <Kbd>Space</Kbd> pause <Kbd>R</Kbd> restart <Kbd>F</Kbd> fullscreen <Kbd>1-7</Kbd> tabs
         </p>
       </Footer>
 

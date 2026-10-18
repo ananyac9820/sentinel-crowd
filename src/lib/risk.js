@@ -25,6 +25,10 @@ export const DEFAULT_SETTINGS = {
   // Live counts flicker more, so they are averaged longer and small movement jitter is ignored.
   // Site-wide CRITICAL must also hold for 3 s, so one noisy frame cannot trigger it.
   live: { watch: 4, warning: 6, critical: 10, surgePct: 50, surgeWindow: 20, surgeMin: 2, turbulence: 60, counterFlow: 55, smoothing: 3, spreadNoise: 0.02, criticalHold: 3 },
+  // Live with the crowd density model: it finds everyone, including people a detector misses in a
+  // packed crowd, so counts per zone run much higher. Starting points per 1/12 of the frame; tune per
+  // camera in Setup (zones nearer the camera cover less floor).
+  density: { watch: 8, warning: 14, critical: 22, surgePct: 40, surgeWindow: 20, surgeMin: 4, turbulence: 60, counterFlow: 55, smoothing: 2, spreadNoise: 0.02, criticalHold: 3 },
 }
 
 export function zoneLevel(count, s) {

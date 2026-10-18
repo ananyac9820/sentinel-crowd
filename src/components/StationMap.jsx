@@ -20,6 +20,7 @@ const FLOWS = {
   gate2: { d: 'M 600 190 C 610 140, 640 110, 660 75', label: 'Out through gate 2 to the footbridge' },
   pauseEntry: { d: 'M 135 150 L 135 185', label: 'Held at concourse', stop: true },
   redirect: { d: 'M 520 170 C 540 120, 620 75, 700 80 L 740 82 L 740 290', label: 'To Platform 3' },
+  emergencyExit: { d: 'M 300 200 C 280 230, 262 240, 236 250', label: 'Out through the platform-end emergency exit' },
 }
 
 export default function StationMap({ mode, mainSnap, sideSnaps, plan, t, onOpenMonitor }) {

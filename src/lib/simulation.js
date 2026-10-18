@@ -50,6 +50,14 @@ export const INTERVENTIONS = {
     tau: 10,
     effect: (k) => (Math.floor(k / GRID_COLS) === 0 ? 0.3 : 0.5),
   },
+  emergencyExit: {
+    label: 'Open emergency exit',
+    short: 'Emergency exit opened',
+    message: 'Platform-end emergency exit opened. People at the west end of Platform 2 are leaving through it.',
+    tau: 12,
+    // A narrow door at the west end: strong effect on the nearest column, little near the staircase.
+    effect: (k) => [0.8, 0.4, 0.12, 0.05][k % GRID_COLS],
+  },
 }
 
 // Crowd without any intervention: it keeps building after the train arrives.
@@ -211,7 +219,9 @@ export function stepSimulation(engine, prevT, t, wall, interventions = defaultPl
   const input = aggregate ? aggregate(grid) : grid
   engine.step(input.counts, t, wall, input.motion)
   for (const iv of interventions) {
-    if (prevT < iv.at && t >= iv.at) {
+    // Half-open [prevT, t): an action applied at the current time (what-if button, DAA plan) has
+    // at === prevT on the next tick, and must still be logged exactly once.
+    if (prevT <= iv.at && t > iv.at) {
       const def = INTERVENTIONS[iv.type]
       engine.addEvent(
         def.message,
