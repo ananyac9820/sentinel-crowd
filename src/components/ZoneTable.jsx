@@ -30,19 +30,24 @@ function Bar({ value, threshold }) {
 }
 
 // Detailed table of every zone: density, forecast and movement.
-export default function ZoneTable({ snap, settings, site, className = '' }) {
+// The Rank column is the position merge sort gave this zone in the danger ranking the decision
+// engine computed, so the table, the alerts and the route search all agree on which zone is worst.
+export default function ZoneTable({ snap, settings, site, ranking, className = '' }) {
   const configured = isConfigured(site)
+  const rankOf = (i) => ranking?.byZoneIndex.get(i) ?? null
   return (
     <section className={`panel flex flex-col ${className}`}>
       <div className="panel-head">
         <span className="label">Zone details</span>
-        <span className="ml-auto text-[11px] text-dim">Trend over 5 s. Turbulence and counter-flow on a 0 to 100 scale; the tick marks the alert level.</span>
+        <span className="ml-auto text-[11px] text-dim">
+          Rank by danger score ({ranking?.algorithm ?? 'merge sort'}). Trend over 5 s. Turbulence and counter-flow on a 0 to 100 scale; the tick marks the alert level.
+        </span>
       </div>
       <div className="scroll-thin min-h-0 flex-1 overflow-auto">
         <table className="w-full text-[13px]">
           <thead className="sticky top-0 bg-panel">
             <tr className="label border-b border-line-strong text-left">
-              {['Zone', 'People', 'Level', 'Trend', 'Critical in', 'Turbulence', 'Counter-flow', 'Moving', 'Nearest exit'].map((h) => (
+              {['Rank', 'Zone', 'People', 'Level', 'Trend', 'Critical in', 'Turbulence', 'Counter-flow', 'Moving', 'Nearest exit'].map((h) => (
                 <th key={h} className="px-3 py-1.5 font-bold">
                   {h}
                 </th>
@@ -57,6 +62,9 @@ export default function ZoneTable({ snap, settings, site, className = '' }) {
               const dir = direction(snap.motion?.[i])
               return (
                 <tr key={z.id} style={l ? { background: `color-mix(in srgb, ${lvl.color} 12%, var(--color-panel))` } : undefined}>
+                  <td className="num px-3 py-1.5 font-bold" style={rankOf(i) === 1 ? { color: 'var(--color-crit)' } : undefined}>
+                    {rankOf(i) ?? '-'}
+                  </td>
                   <td className="num px-3 py-1.5 font-bold">{z.name}</td>
                   <td className="num px-3 py-1.5 text-[16px] font-bold" style={{ color: l ? lvl.color : undefined }}>
                     {snap.counts[i]}
