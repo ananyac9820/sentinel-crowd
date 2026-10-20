@@ -12,7 +12,11 @@ import ZoneEditor from './ZoneEditor.jsx'
 import SitePanel from './SitePanel.jsx'
 import StationMap from './StationMap.jsx'
 import TimelineView from './TimelineView.jsx'
+import DecisionBar from './DecisionBar.jsx'
+import DecisionPanel from './DecisionPanel.jsx'
+import AlgorithmLab from './AlgorithmLab.jsx'
 import useLiveDetection from '../hooks/useLiveDetection.jsx'
+import useDecision from '../hooks/useDecision.jsx'
 import { CrowdEngine, DEFAULT_SETTINGS, emptySnapshot } from '../lib/risk.js'
 import { DEFAULT_ZONES, GRID_CELLS, aggregateGrid, aggregatePeople, finalise } from '../lib/zones.js'
 import { AUTO_INTERVENTION_AT, STATION_CAMERAS, simGrid, sideGrid, stepSimulation } from '../lib/simulation.js'
@@ -23,6 +27,8 @@ import { alertsCsv, download, openReport, timelineCsv } from '../lib/report.js'
 const TICK_MS = 500
 const TABS = [
   ['monitor', 'Monitor'],
+  ['decision', 'Decision'],
+  ['algorithms', 'Algorithms'],
   ['station', 'Station'],
   ['zones', 'Zones'],
   ['timeline', 'Timeline'],
@@ -194,6 +200,9 @@ export default function Dashboard({ onHome }) {
   }, [engine])
   const live = useLiveDetection({ active: mode === 'live', onPeople: onLivePeople, onSourceChange: onLiveSource, onSwitchToSim: () => switchMode('sim') })
 
+  // ---- Algorithmic decision engine: graph, traversal, shortest path, flow, optimisation ----
+  const { decision, runWhatIf, whatIfBusy } = useDecision({ snap, settings: settings[mode], site: sites[mode] })
+
   // ---- Alarm sound and simulated SMS for serious alerts ----
   const seenRef = useRef(0)
   const lastAlarmRef = useRef(0)
@@ -228,7 +237,7 @@ export default function Dashboard({ onHome }) {
 
   useEffect(() => save('sentinel.notify.v1', notify), [notify])
 
-  // ---- Presenter shortcuts: Space = pause/play, R = restart, F = fullscreen, 1-5 = tabs ----
+  // ---- Presenter shortcuts: Space = pause/play, R = restart, F = fullscreen, 1-7 = tabs ----
   const keysRef = useRef(null)
   keysRef.current = { mode, restartSim, togglePlay: live.togglePlay }
   useEffect(() => {
@@ -247,7 +256,7 @@ export default function Dashboard({ onHome }) {
       } else if (e.key === 'f' || e.key === 'F') {
         if (document.fullscreenElement) document.exitFullscreen?.()
         else document.documentElement.requestFullscreen?.().catch(() => {})
-      } else if (/^[1-5]$/.test(e.key)) {
+      } else if (/^[1-7]$/.test(e.key)) {
         setTab(TABS[Number(e.key) - 1][0])
       }
     }
@@ -346,12 +355,17 @@ export default function Dashboard({ onHome }) {
               live={live}
               site={sites[mode]}
             />
+            <DecisionBar decision={decision} onOpen={() => setTab('decision')} />
             <DensityChart compact className="h-[118px] shrink-0" timeline={snap.timeline} now={snap.t} />
           </div>
           <AlertsFeed alerts={snap.alerts} className="max-lg:max-h-[70vh] lg:min-h-0" />
         </div>
 
-        {tab === 'station' && <StationMap mode={mode} mainSnap={snap} sideSnaps={sideSnaps} plan={plan} t={simT} onOpenMonitor={() => setTab('monitor')} />}
+        {tab === 'decision' && <DecisionPanel decision={decision} onRunWhatIf={runWhatIf} whatIfBusy={whatIfBusy} mode={mode} />}
+
+        {tab === 'algorithms' && <AlgorithmLab decision={decision} settings={settings[mode]} />}
+
+        {tab === 'station' &&<StationMap mode={mode} mainSnap={snap} sideSnaps={sideSnaps} plan={plan} t={simT} onOpenMonitor={() => setTab('monitor')} />}
 
         {tab === 'zones' && (
           <div className="grid gap-3 [&>*]:min-w-0 lg:h-full lg:min-h-0 lg:grid-cols-[400px_minmax(0,1fr)]">
@@ -369,7 +383,7 @@ export default function Dashboard({ onHome }) {
                 Change zones, exits and entries on the <button className="link" onClick={() => setTab('setup')}>Setup</button> tab. Alerts name the nearest configured exit; with no site configured they name none.
               </p>
             </section>
-            <ZoneTable snap={snap} settings={settings[mode]} site={sites[mode]} className="lg:min-h-0" />
+            <ZoneTable snap={snap} settings={settings[mode]} site={sites[mode]} ranking={decision?.ranking} className="lg:min-h-0" />
           </div>
         )}
 
@@ -399,7 +413,7 @@ export default function Dashboard({ onHome }) {
 
       <Footer className="px-3 pb-2">
         <p className="num text-dim max-lg:hidden" aria-label="Keyboard shortcuts">
-          <Kbd>Space</Kbd> pause <Kbd>R</Kbd> restart <Kbd>F</Kbd> fullscreen <Kbd>1-5</Kbd> tabs
+          <Kbd>Space</Kbd> pause <Kbd>R</Kbd> restart <Kbd>F</Kbd> fullscreen <Kbd>1-7</Kbd> tabs
         </p>
       </Footer>
 

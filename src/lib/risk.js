@@ -9,6 +9,7 @@
 
 import { DEFAULT_ZONES, GRID_CELLS } from './zones.js'
 import { PROFILES, advise, adviceSource, zoneLinks } from './site.js'
+import { bandOf } from '../algorithms/searching/binarySearch.js'
 
 export const LEVELS = [
   { key: 'SAFE', label: 'SAFE', color: '#2f7a45' },
@@ -27,11 +28,13 @@ export const DEFAULT_SETTINGS = {
   live: { watch: 4, warning: 6, critical: 10, surgePct: 50, surgeWindow: 20, surgeMin: 2, turbulence: 60, counterFlow: 55, smoothing: 3, spreadNoise: 0.02, criticalHold: 3 },
 }
 
+// Which risk band a density falls into. The thresholds are ascending by construction, so this is
+// a lookup in sorted data: `bandOf` is a binary search returning how many thresholds the value has
+// reached (see algorithms/searching/binarySearch.js). With four bands the saving over an if-chain
+// is negligible; the reason to write it this way is that the band list is data, so adding a band
+// needs no change here.
 export function zoneLevel(count, s) {
-  if (count >= s.critical) return 3
-  if (count >= s.warning) return 2
-  if (count >= s.watch) return 1
-  return 0
+  return bandOf([s.watch, s.warning, s.critical], count).band
 }
 
 const thresholdFor = (level, s) => [0, s.watch, s.warning, s.critical][level]
